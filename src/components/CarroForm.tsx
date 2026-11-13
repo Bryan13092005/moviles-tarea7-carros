@@ -307,7 +307,6 @@ export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, on
       }
 
       await onSubmit({ ...valores, imgURL });
-      triggerHaptic('success');
     } catch (e) {
       // Si la imagen se subió pero el guardado falló, se evita dejarla huérfana.
       if (urlSubida) {

@@ -1,113 +1,118 @@
-import { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
-import type { DimensionValue } from 'react-native';
+import LottieView from 'lottie-react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
-  cancelAnimation,
-  useAnimatedStyle,
+  FadeIn,
+  FadeOut,
+  ReduceMotion,
   useReducedMotion,
-  useSharedValue,
-  withRepeat,
-  withSequence,
-  withTiming,
 } from 'react-native-reanimated';
 
-import { colors, EASE_IN_OUT, ENTER_FADE, EXIT_FADE, radius, spacing } from '../theme';
+import cargaAnimation from '../../assets/animaciones/carga.json';
+import { colors, EASE_OUT, radius, shadows, spacing, text } from '../theme';
+
+const ENTER_LOADER = FadeIn.duration(220)
+  .easing(EASE_OUT)
+  .reduceMotion(ReduceMotion.System);
+
+const EXIT_LOADER = FadeOut.duration(240)
+  .easing(EASE_OUT)
+  .reduceMotion(ReduceMotion.System);
 
 type Props = {
-  /** Ancho de cada columna, para que el esqueleto mida igual que las tarjetas. */
-  ancho: number;
-  /** Filas de tarjetas a dibujar. */
-  filas?: number;
+  /** Mantiene compatibilidad de firma con llamadas previas en el catálogo. */
+  ancho?: number;
+  mensaje?: string;
+  detalle?: string;
 };
 
-function Bloque({ alto, ancho }: { alto: number; ancho: DimensionValue }) {
-  return (
-    <View
-      style={{
-        height: alto,
-        width: ancho,
-        borderRadius: 4,
-        backgroundColor: colors.skeleton,
-      }}
-    />
-  );
-}
-
 /**
- * Estado de carga del catálogo en el UI thread con Reanimated:
- * tarjetas vacías con la misma geometría que `CarroCard`, para que la cuadrícula
- * no salte al llegar los datos y el pulso siga corriendo aunque el hilo JS trabaje.
+ * Estado de carga inicial del catálogo con ilustración vectorial Lottie (`carga.json`)
+ * en bucle y transición de salida fluida (`FadeOut`) en el UI thread con Reanimated.
  */
-export function CatalogoSkeleton({ ancho, filas = 2 }: Props) {
+export function CatalogoSkeleton({
+  mensaje = 'Cargando tu garaje...',
+  detalle = 'Sincronizando los vehículos verificados del catálogo.',
+}: Props) {
   const reducedMotion = useReducedMotion();
-  const opacidad = useSharedValue(0.6);
-
-  useEffect(() => {
-    if (reducedMotion) {
-      opacidad.set(0.8);
-      return;
-    }
-
-    opacidad.set(
-      withRepeat(
-        withSequence(
-          withTiming(1, { duration: 680, easing: EASE_IN_OUT }),
-          withTiming(0.52, { duration: 680, easing: EASE_IN_OUT }),
-        ),
-        -1,
-        false,
-      ),
-    );
-
-    return () => {
-      cancelAnimation(opacidad);
-    };
-  }, [opacidad, reducedMotion]);
-
-  const pulseStyle = useAnimatedStyle(() => ({
-    opacity: opacidad.get(),
-  }));
 
   return (
     <Animated.View
-      entering={ENTER_FADE}
-      exiting={EXIT_FADE}
-      style={{ gap: spacing.md }}
-      accessibilityLabel="Cargando vehículos"
+      entering={ENTER_LOADER}
+      exiting={EXIT_LOADER}
+      style={styles.contenedor}
+      accessibilityRole="progressbar"
+      accessibilityLabel={mensaje}
+      accessibilityLiveRegion="polite"
     >
-      {Array.from({ length: filas }, (_, fila) => (
-        <View key={fila} style={{ flexDirection: 'row', gap: spacing.md }}>
-          {[0, 1].map((columna) => (
-            <Animated.View
-              key={columna}
-              style={[
-                {
-                  width: ancho,
-                  backgroundColor: colors.surface,
-                  borderRadius: radius.lg,
-                  borderCurve: 'continuous',
-                  overflow: 'hidden',
-                },
-                pulseStyle,
-              ]}
-            >
-              <View
-                style={{
-                  width: '100%',
-                  aspectRatio: 1.45,
-                  backgroundColor: colors.skeleton,
-                }}
-              />
-              <View style={{ padding: spacing.md, gap: spacing.sm }}>
-                <Bloque alto={10} ancho="45%" />
-                <Bloque alto={16} ancho="70%" />
-                <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.divider }} />
-                <Bloque alto={18} ancho="55%" />
-              </View>
-            </Animated.View>
-          ))}
+      <View style={styles.tarjeta}>
+        <View style={styles.escena}>
+          <LottieView
+            source={cargaAnimation}
+            autoPlay={!reducedMotion}
+            loop={!reducedMotion}
+            resizeMode="contain"
+            style={styles.lottie}
+          />
         </View>
-      ))}
+
+        <View style={styles.textos}>
+          <Text style={styles.titulo}>{mensaje}</Text>
+          <Text style={[text.body, styles.detalle]}>{detalle}</Text>
+        </View>
+      </View>
     </Animated.View>
   );
 }
+
+const styles = StyleSheet.create({
+  contenedor: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xxl,
+    paddingHorizontal: spacing.md,
+  },
+  tarjeta: {
+    width: '100%',
+    maxWidth: 340,
+    alignItems: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xl,
+    borderRadius: radius.xxl,
+    borderCurve: 'continuous',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    boxShadow: shadows.card,
+    gap: spacing.md,
+  },
+  escena: {
+    width: 220,
+    height: 110,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lottie: {
+    width: '100%',
+    height: '100%',
+  },
+  textos: {
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  titulo: {
+    fontSize: 18,
+    lineHeight: 23,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+    color: colors.ink,
+    textAlign: 'center',
+  },
+  detalle: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.inkMuted,
+    textAlign: 'center',
+    maxWidth: 260,
+  },
+});

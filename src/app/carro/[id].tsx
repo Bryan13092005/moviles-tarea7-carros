@@ -1,18 +1,19 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { carrosService } from '../../api/supabase.service';
 import { useCarros } from '../../api/useCarros';
+import { ActionAnimationOverlay } from '../../components/ActionAnimationOverlay';
 import { CarroForm } from '../../components/CarroForm';
+import { CatalogoSkeleton } from '../../components/CatalogoSkeleton';
 import { Icon } from '../../components/Icon';
 import { PressableScale } from '../../components/PressableScale';
 import {
   colors,
   ENTER_DOWN,
-  ENTER_FADE,
   EXIT_FADE,
   radius,
   spacing,
@@ -32,6 +33,7 @@ export default function EditarCarroScreen() {
   const [carro, setCarro] = useState<Carro | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [guardadoExitoso, setGuardadoExitoso] = useState(false);
 
   useEffect(() => {
     let activo = true;
@@ -72,10 +74,15 @@ export default function EditarCarroScreen() {
   const manejarEnvio = useCallback(
     async (values: NuevoCarro) => {
       await actualizarCarro(carroId, values);
-      router.back();
+      setGuardadoExitoso(true);
     },
-    [actualizarCarro, carroId, router],
+    [actualizarCarro, carroId],
   );
+
+  const volverAlCatalogo = useCallback(() => {
+    setGuardadoExitoso(false);
+    router.back();
+  }, [router]);
 
   const cancelar = useCallback(() => {
     router.back();
@@ -83,14 +90,12 @@ export default function EditarCarroScreen() {
 
   if (loading) {
     return (
-      <Animated.View
-        entering={ENTER_FADE}
-        exiting={EXIT_FADE}
-        style={[styles.centrado, { paddingTop: insets.top + spacing.xxl }]}
-      >
-        <ActivityIndicator size="large" color={colors.inkMuted} />
-        <Text style={[text.body, styles.ayuda]}>Cargando carro...</Text>
-      </Animated.View>
+      <View style={[styles.centrado, { paddingTop: insets.top }]}>
+        <CatalogoSkeleton
+          mensaje="Cargando vehículo..."
+          detalle="Recuperando la ficha técnica desde tu garaje."
+        />
+      </View>
     );
   }
 
@@ -126,12 +131,20 @@ export default function EditarCarroScreen() {
   }
 
   return (
-    <CarroForm
-      initialValues={carro}
-      submitLabel="Guardar cambios"
-      onSubmit={manejarEnvio}
-      onCancel={cancelar}
-    />
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <CarroForm
+        initialValues={carro}
+        submitLabel="Guardar cambios"
+        onSubmit={manejarEnvio}
+        onCancel={cancelar}
+      />
+
+      <ActionAnimationOverlay
+        visible={guardadoExitoso}
+        variant="editar"
+        onFinish={volverAlCatalogo}
+      />
+    </View>
   );
 }
 
@@ -161,9 +174,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     maxWidth: 300,
     color: colors.danger,
-  },
-  ayuda: {
-    color: colors.inkMuted,
   },
   boton: {
     marginTop: spacing.sm,

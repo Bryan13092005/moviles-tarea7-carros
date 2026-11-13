@@ -24,6 +24,7 @@ import Animated, {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useCarros } from '../api/useCarros';
+import { ActionAnimationOverlay } from '../components/ActionAnimationOverlay';
 import { ActionSheet, type SheetOption } from '../components/ActionSheet';
 import { CarroCard } from '../components/CarroCard';
 import type { Insignia } from '../components/CarroCard';
@@ -406,6 +407,8 @@ export default function IndexScreen() {
   const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
   const [eliminando, setEliminando] = useState(false);
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
+  const [mostrarExitoEliminar, setMostrarExitoEliminar] = useState(false);
+  const [recargandoVisual, setRecargandoVisual] = useState(false);
 
   const esPrimerFoco = useRef(true);
 
@@ -481,9 +484,9 @@ export default function IndexScreen() {
     setErrorAccion(null);
     try {
       await eliminarCarro(carroAcciones.id);
-      triggerHaptic('success');
       setCarroAcciones(null);
       setConfirmandoEliminar(false);
+      setMostrarExitoEliminar(true);
     } catch (e) {
       triggerHaptic('error');
       setErrorAccion(
@@ -576,13 +579,25 @@ export default function IndexScreen() {
     setTipoActivo(TODOS);
   }, []);
 
-  const manejarRecarga = useCallback(() => {
+  const manejarRecarga = useCallback(async () => {
+    if (recargandoVisual || refreshing) return;
     triggerHaptic('light');
-    void refrescar();
-  }, [refrescar]);
+    setRecargandoVisual(true);
+    try {
+      await Promise.all([
+        refrescar(),
+        new Promise<void>((resolve) => {
+          setTimeout(resolve, 1100);
+        }),
+      ]);
+    } finally {
+      setRecargandoVisual(false);
+    }
+  }, [recargandoVisual, refrescar, refreshing]);
 
-  const cargando = loading && carros.length === 0;
-  const errorSinDatos = !loading && !carros.length && error !== null;
+  const mostrandoRecarga = refreshing || recargandoVisual;
+  const cargando = loading || mostrandoRecarga;
+  const errorSinDatos = !cargando && !carros.length && error !== null;
 
   const hayFiltros = busqueda.trim().length > 0 || chipActivo !== TODOS;
 
@@ -617,12 +632,12 @@ export default function IndexScreen() {
               orden={orden}
               onCrear={irACrear}
               onOrdenar={abrirOrden}
-              onRecargar={manejarRecarga}
-              refreshing={refreshing}
+              onRecargar={() => void manejarRecarga()}
+              refreshing={mostrandoRecarga}
               total={visibles.length}
             />
 
-            {error && carros.length > 0 ? (
+            {error && carros.length > 0 && !cargando ? (
               <Animated.View entering={ENTER_DOWN_FAST} exiting={EXIT_UP} style={styles.aviso}>
                 <Icon
                   ios="exclamationmark.triangle.fill"
@@ -639,7 +654,11 @@ export default function IndexScreen() {
         }
         ListEmptyComponent={
           cargando ? (
-            <CatalogoSkeleton ancho={anchoTarjeta} />
+            <CatalogoSkeleton
+              ancho={anchoTarjeta}
+              mensaje={mostrandoRecarga ? 'Actualizando tu garaje...' : 'Cargando tu garaje...'}
+              detalle="Sincronizando los vehículos verificados del catálogo."
+            />
           ) : errorSinDatos ? (
             <EstadoCatalogo
               ios="exclamationmark.triangle.fill"
@@ -673,8 +692,8 @@ export default function IndexScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
-            onRefresh={manejarRecarga}
+            refreshing={mostrandoRecarga}
+            onRefresh={() => void manejarRecarga()}
             tintColor={colors.inkMuted}
             colors={[colors.ink]}
           />
@@ -759,6 +778,13 @@ export default function IndexScreen() {
           </View>
         ) : null}
       </ActionSheet>
+
+      {/* Animación Lottie al completar la eliminación de un vehículo */}
+      <ActionAnimationOverlay
+        visible={mostrarExitoEliminar}
+        variant="eliminar"
+        onFinish={() => setMostrarExitoEliminar(false)}
+      />
     </SafeAreaView>
   );
 }
