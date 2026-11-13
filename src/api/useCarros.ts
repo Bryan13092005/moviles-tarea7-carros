@@ -50,6 +50,9 @@ export function useCarros({ autoLoad = true }: OpcionesUseCarros = {}) {
   }, []);
 
   useEffect(() => {
+    // La carga inicial es un fetch on-mount intencional; el setState diferido
+    // que exige la regla no aporta nada aquí.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (autoLoad) void cargar('inicial');
   }, [autoLoad, cargar]);
 

@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,9 +12,11 @@ import {
   View,
 } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { eliminarImagenPorUrl, subirImagenCarro } from '../api/storage.service';
 import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
+import { colors, radius, spacing, text } from '../theme';
 import type { NuevoCarro } from '../types/carro';
 import { VerificarIMG } from './VerificarIMG';
 
@@ -33,12 +34,19 @@ type EstadoVerificacion = 'sin-imagen' | 'analizando' | 'nitida' | 'borrosa' | '
 const ANIO_MIN = 1900;
 const ANIO_MAX = 2100;
 
+/** Límites de texto alineados con el ancho de la tarjeta del catálogo. */
+const LIMITE_MARCA = 60;
+const LIMITE_TIPO = 60;
+const LIMITE_PRECIO = 12;
+
 function textoInicial(valor: number | string | undefined): string {
   if (valor === undefined || valor === null) return '';
   return String(valor);
 }
 
 export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, onCancel }: Props) {
+  const insets = useSafeAreaInsets();
+
   const [tipo, setTipo] = useState(textoInicial(initialValues?.tipo));
   const [marca, setMarca] = useState(textoInicial(initialValues?.marca));
   const [precio, setPrecio] = useState(textoInicial(initialValues?.precio));
@@ -48,7 +56,7 @@ export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, on
   // la que ya estaba guardada en el bucket.
   const [imagenLocal, setImagenLocal] = useState<string | null>(null);
   const [imagenLocalMime, setImagenLocalMime] = useState<string | null>(null);
-  const [imagenRemota, setImagenRemota] = useState<string | null>(initialValues?.imgURL ?? null);
+  const [imagenRemota] = useState<string | null>(initialValues?.imgURL ?? null);
   const [quitarImagen, setQuitarImagen] = useState(false);
   const [procesandoImagen, setProcesandoImagen] = useState(false);
   const [verificacion, setVerificacion] = useState<EstadoVerificacion>('sin-imagen');
@@ -140,9 +148,7 @@ export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, on
 
   function aplicarSeleccion(asset: ImagePicker.ImagePickerAsset) {
     setImagenLocal(asset.uri);
-    console.log('Imagen seleccionada:', asset.uri);
     setImagenLocalMime(asset.mimeType ?? null);
-    console.log('Mime type de la imagen:', asset.mimeType);
     setQuitarImagen(false);
     setVerificacion('analizando');
   }
@@ -234,7 +240,6 @@ export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, on
 
       if (imagenLocal) {
         urlSubida = await subirImagenCarro(imagenLocal, imagenLocalMime);
-        console.log('Imagen para subida:', urlSubida);
         imgURL = urlSubida;
       } else if (quitarImagen) {
         imgURL = null;
@@ -258,14 +263,14 @@ export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, on
     <View style={styles.container}>
       <ScrollView
         ref={scroll}
-        contentContainerStyle={[styles.contenido, { paddingBottom: 16 + alturaTeclado }]}
+        contentContainerStyle={[styles.contenido, { paddingBottom: 16 + alturaTeclado + insets.bottom }]}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        keyboardDismissMode={process.env.EXPO_OS === 'ios' ? 'interactive' : 'on-drag'}
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.campo}>
-          <Text style={styles.label}>Imagen del carro</Text>
+          <Text style={text.label}>Imagen del carro</Text>
 
           {imagenLocal ? (
             <VerificarIMG
@@ -287,7 +292,7 @@ export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, on
 
               {procesandoImagen ? (
                 <View style={styles.cargandoImagen}>
-                  <ActivityIndicator />
+                  <ActivityIndicator color={colors.inkMuted} />
                 </View>
               ) : null}
             </View>
@@ -341,17 +346,30 @@ export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, on
             posiciones.current.marca = evento.nativeEvent.layout.y;
           }}
         >
-          <Text style={styles.label}>Marca</Text>
+          <Text style={text.label}>Marca</Text>
           <TextInput
             value={marca}
             onChangeText={setMarca}
             onFocus={() => enfocarCampo('marca')}
+            onBlur={() => setCampoEnfocado(null)}
             placeholder="Ej. Toyota"
+            placeholderTextColor={colors.inkSubtle}
+            selectionColor={colors.ink}
             autoCapitalize="words"
-            style={[styles.input, errores.marca && styles.inputError]}
+            maxLength={LIMITE_MARCA}
+            style={[
+              text.input,
+              styles.input,
+              campoEnfocado === 'marca' && styles.inputEnfocado,
+              errores.marca && styles.inputError,
+            ]}
             editable={!ocupado}
           />
-          {errores.marca ? <Text style={styles.error}>{errores.marca}</Text> : null}
+          {errores.marca ? (
+            <Text style={text.errorText} accessibilityLiveRegion="polite">
+              {errores.marca}
+            </Text>
+          ) : null}
         </View>
 
         <View
@@ -360,17 +378,30 @@ export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, on
             posiciones.current.tipo = evento.nativeEvent.layout.y;
           }}
         >
-          <Text style={styles.label}>Tipo</Text>
+          <Text style={text.label}>Tipo</Text>
           <TextInput
             value={tipo}
             onChangeText={setTipo}
             onFocus={() => enfocarCampo('tipo')}
+            onBlur={() => setCampoEnfocado(null)}
             placeholder="Ej. Sedán"
+            placeholderTextColor={colors.inkSubtle}
+            selectionColor={colors.ink}
             autoCapitalize="sentences"
-            style={[styles.input, errores.tipo && styles.inputError]}
+            maxLength={LIMITE_TIPO}
+            style={[
+              text.input,
+              styles.input,
+              campoEnfocado === 'tipo' && styles.inputEnfocado,
+              errores.tipo && styles.inputError,
+            ]}
             editable={!ocupado}
           />
-          {errores.tipo ? <Text style={styles.error}>{errores.tipo}</Text> : null}
+          {errores.tipo ? (
+            <Text style={text.errorText} accessibilityLiveRegion="polite">
+              {errores.tipo}
+            </Text>
+          ) : null}
         </View>
 
         <View
@@ -379,18 +410,30 @@ export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, on
             posiciones.current.anio = evento.nativeEvent.layout.y;
           }}
         >
-          <Text style={styles.label}>Año</Text>
+          <Text style={text.label}>Año</Text>
           <TextInput
             value={anio}
             onChangeText={setAnio}
             onFocus={() => enfocarCampo('anio')}
+            onBlur={() => setCampoEnfocado(null)}
             placeholder="Ej. 2024"
+            placeholderTextColor={colors.inkSubtle}
+            selectionColor={colors.ink}
             keyboardType="number-pad"
             maxLength={4}
-            style={[styles.input, errores.anio && styles.inputError]}
+            style={[
+              text.input,
+              styles.input,
+              campoEnfocado === 'anio' && styles.inputEnfocado,
+              errores.anio && styles.inputError,
+            ]}
             editable={!ocupado}
           />
-          {errores.anio ? <Text style={styles.error}>{errores.anio}</Text> : null}
+          {errores.anio ? (
+            <Text style={text.errorText} accessibilityLiveRegion="polite">
+              {errores.anio}
+            </Text>
+          ) : null}
         </View>
 
         <View
@@ -399,20 +442,37 @@ export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, on
             posiciones.current.precio = evento.nativeEvent.layout.y;
           }}
         >
-          <Text style={styles.label}>Precio</Text>
+          <Text style={text.label}>Precio</Text>
           <TextInput
             value={precio}
             onChangeText={setPrecio}
             onFocus={() => enfocarCampo('precio')}
+            onBlur={() => setCampoEnfocado(null)}
             placeholder="Ej. 25000.00"
+            placeholderTextColor={colors.inkSubtle}
+            selectionColor={colors.ink}
             keyboardType="decimal-pad"
-            style={[styles.input, errores.precio && styles.inputError]}
+            maxLength={LIMITE_PRECIO}
+            style={[
+              text.input,
+              styles.input,
+              campoEnfocado === 'precio' && styles.inputEnfocado,
+              errores.precio && styles.inputError,
+            ]}
             editable={!ocupado}
           />
-          {errores.precio ? <Text style={styles.error}>{errores.precio}</Text> : null}
+          {errores.precio ? (
+            <Text style={text.errorText} accessibilityLiveRegion="polite">
+              {errores.precio}
+            </Text>
+          ) : null}
         </View>
 
-        {errorEnvio ? <Text style={styles.errorEnvio}>{errorEnvio}</Text> : null}
+        {errorEnvio ? (
+          <Text style={styles.errorEnvio} accessibilityLiveRegion="assertive" selectable>
+            {errorEnvio}
+          </Text>
+        ) : null}
 
         <View style={styles.acciones}>
           {onCancel ? (
@@ -434,6 +494,7 @@ export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, on
             accessibilityRole="button"
             onPress={manejarEnvio}
             disabled={ocupado}
+            accessibilityState={{ disabled: ocupado, busy: enviando }}
             style={({ pressed }) => [
               styles.boton,
               styles.botonPrimario,
@@ -453,67 +514,66 @@ export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, on
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f7f7f7',
+    backgroundColor: colors.background,
   },
   contenido: {
-    padding: 16,
-    gap: 14,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    gap: spacing.lg,
   },
   campo: {
-    gap: 6,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333333',
+    gap: spacing.xs + 1,
   },
   input: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#d0d0d0',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    color: '#111111',
+    borderColor: colors.fieldBorder,
+    borderRadius: radius.md,
+    borderCurve: 'continuous',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    minHeight: 48,
+  },
+  inputEnfocado: {
+    borderColor: colors.ink,
   },
   inputError: {
-    borderColor: '#d1242f',
-  },
-  error: {
-    fontSize: 13,
-    color: '#d1242f',
+    borderColor: colors.danger,
   },
   errorEnvio: {
     fontSize: 14,
-    color: '#d1242f',
-    backgroundColor: '#fff0f0',
+    lineHeight: 20,
+    fontWeight: '500',
+    color: colors.danger,
+    backgroundColor: colors.dangerSoft,
     borderWidth: 1,
-    borderColor: '#f2b8bd',
-    borderRadius: 8,
-    padding: 10,
+    borderColor: colors.dangerBorder,
+    borderRadius: radius.md,
+    borderCurve: 'continuous',
+    padding: spacing.md,
   },
   imagenContenedor: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#d0d0d0',
-    borderRadius: 8,
+    borderColor: colors.fieldBorder,
+    borderRadius: radius.lg,
+    borderCurve: 'continuous',
     overflow: 'hidden',
   },
   imagen: {
     width: '100%',
     aspectRatio: 4 / 3,
-    backgroundColor: '#eeeeee',
+    backgroundColor: colors.surfaceMuted,
   },
   imagenVacia: {
     width: '100%',
     aspectRatio: 4 / 3,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#eeeeee',
+    backgroundColor: colors.surfaceMuted,
   },
   textoImagenVacia: {
-    color: '#777777',
+    color: colors.inkMuted,
     fontSize: 14,
   },
   cargandoImagen: {
@@ -524,60 +584,68 @@ const styles = StyleSheet.create({
     left: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
   },
   accionesImagen: {
     flexDirection: 'row',
-    gap: 8,
+    gap: spacing.sm,
   },
   botonImagen: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
+    minHeight: 44,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    borderCurve: 'continuous',
     borderWidth: 1,
-    borderColor: '#c4c4c4',
-    backgroundColor: '#ffffff',
+    borderColor: colors.fieldBorder,
+    backgroundColor: colors.surface,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   botonQuitar: {
-    borderColor: '#d1242f',
-    backgroundColor: '#fff0f0',
+    borderColor: colors.dangerBorder,
+    backgroundColor: colors.dangerSoft,
   },
   textoBotonImagen: {
-    color: '#333333',
+    color: colors.inkSoft,
     fontWeight: '600',
+    fontSize: 15,
   },
   textoQuitar: {
-    color: '#d1242f',
+    color: colors.danger,
     fontWeight: '600',
+    fontSize: 15,
   },
   acciones: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 8,
+    gap: spacing.md,
+    marginTop: spacing.sm,
   },
   boton: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
+    minHeight: 50,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    borderCurve: 'continuous',
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
   },
   botonPrimario: {
-    backgroundColor: '#1f6feb',
-    borderColor: '#1f6feb',
+    backgroundColor: colors.ink,
+    borderColor: colors.ink,
   },
   botonSecundario: {
-    backgroundColor: '#ffffff',
-    borderColor: '#c4c4c4',
+    backgroundColor: colors.surface,
+    borderColor: colors.fieldBorder,
   },
   textoPrimario: {
-    color: '#ffffff',
+    color: colors.onInk,
     fontWeight: '600',
     fontSize: 16,
   },
   textoSecundario: {
-    color: '#333333',
+    color: colors.inkSoft,
     fontWeight: '600',
     fontSize: 16,
   },

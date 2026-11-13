@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Animated, Platform, StyleSheet, View } from 'react-native';
+import { Animated, StyleSheet, View } from 'react-native';
 import type { DimensionValue } from 'react-native';
 
 import { colors, radius, spacing } from '../theme';
 
 /** `useNativeDriver` no existe en web: ahí la animación cae a JS sin ruido en consola. */
-const USAR_DRIVER_NATIVO = Platform.OS !== 'web';
+const USAR_DRIVER_NATIVO = process.env.EXPO_OS !== 'web';
 
 type Props = {
   /** Ancho de cada columna, para que el esqueleto mida igual que las tarjetas. */

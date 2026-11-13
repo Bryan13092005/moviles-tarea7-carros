@@ -59,7 +59,7 @@
       "source": "pbakaus/impeccable",
       "sourceType": "github",
       "skillPath": ".agents/skills/impeccable/SKILL.md",
-      "computedHash": "86e265bf3df79c65215f7244d71892ca278370d56dec47a8cc15e8373db3f714"
+      "computedHash": "ba6f33350863bd8138de222e55a7bf0f409ed329770a92e3db7535cbd2d0fb80"
     },
     "vercel-react-native-skills": {
       "source": "vercel-labs/agent-skills",

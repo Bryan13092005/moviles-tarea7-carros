@@ -144,7 +144,8 @@ function EncabezadoCatalogo({
               accessibilityRole="button"
               accessibilityLabel="Borrar búsqueda"
               onPress={() => onBuscar('')}
-              hitSlop={8}
+              hitSlop={6}
+              style={styles.botonLimpiar}
             >
               <Icon ios="xmark.circle.fill" android="cancel" size={18} color={colors.inkSubtle} />
             </Pressable>
@@ -428,7 +429,10 @@ export default function IndexScreen() {
             />
           )
         }
-        contentContainerStyle={styles.contenido}
+        contentContainerStyle={[
+          styles.contenido,
+          { paddingBottom: spacing.xxl + insets.bottom },
+        ]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
@@ -478,8 +482,8 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   logo: {
-    width: 42,
-    height: 42,
+    width: 44,
+    height: 44,
     borderRadius: radius.md,
     borderCurve: 'continuous',
     backgroundColor: colors.ink,
@@ -487,8 +491,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   botonRedondo: {
-    width: 42,
-    height: 42,
+    width: 44,
+    height: 44,
     borderRadius: radius.full,
     backgroundColor: colors.surface,
     alignItems: 'center',
@@ -537,6 +541,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  botonLimpiar: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   chipsDesborde: {
     marginHorizontal: -spacing.lg,
     marginTop: spacing.md,
@@ -547,7 +558,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   chip: {
-    height: 38,
+    height: 44,
     paddingHorizontal: spacing.lg,
     borderRadius: radius.full,
     borderWidth: 1,
@@ -599,7 +610,9 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: radius.md,
     borderCurve: 'continuous',
-    backgroundColor: '#FBEDEB',
+    backgroundColor: colors.dangerSoft,
+    borderWidth: 1,
+    borderColor: colors.dangerBorder,
   },
   avisoTexto: {
     flex: 1,

@@ -1,14 +1,18 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { carrosService } from '../../api/supabase.service';
 import { useCarros } from '../../api/useCarros';
 import { CarroForm } from '../../components/CarroForm';
+import { Icon } from '../../components/Icon';
+import { colors, radius, spacing, text } from '../../theme';
 import type { Carro, NuevoCarro } from '../../types/carro';
 
 export default function EditarCarroScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const carroId = Number(id);
 
@@ -66,23 +70,34 @@ export default function EditarCarroScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centrado}>
-        <ActivityIndicator size="large" />
-        <Text style={styles.ayuda}>Cargando carro...</Text>
+      <View style={[styles.centrado, { paddingTop: insets.top + spacing.xxl }]}>
+        <ActivityIndicator size="large" color={colors.inkMuted} />
+        <Text style={[text.body, styles.ayuda]}>Cargando carro...</Text>
       </View>
     );
   }
 
   if (error || !carro) {
     return (
-      <View style={styles.centrado}>
-        <Text style={styles.error}>{error ?? 'No se encontró el carro.'}</Text>
+      <View style={[styles.centrado, { paddingTop: insets.top + spacing.xxl }]}>
+        <View style={styles.estadoIcono}>
+          <Icon
+            ios="exclamationmark.triangle.fill"
+            android="warning"
+            size={24}
+            color={colors.danger}
+          />
+        </View>
+        <Text style={[text.sectionTitle, styles.errorTitulo]}>No pudimos abrir el carro</Text>
+        <Text style={[text.body, styles.errorMensaje]} selectable>
+          {error ?? 'No se encontró el carro.'}
+        </Text>
         <Pressable
           accessibilityRole="button"
           onPress={cancelar}
           style={({ pressed }) => [styles.boton, pressed && styles.pressed]}
         >
-          <Text style={styles.textoBoton}>Volver</Text>
+          <Text style={text.button}>Volver</Text>
         </Pressable>
       </View>
     );
@@ -103,28 +118,40 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
-    gap: 12,
-    backgroundColor: '#f7f7f7',
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xxl,
+    gap: spacing.md,
+    backgroundColor: colors.background,
   },
-  ayuda: {
-    fontSize: 15,
-    color: '#555555',
+  estadoIcono: {
+    width: 52,
+    height: 52,
+    borderRadius: radius.full,
+    backgroundColor: colors.dangerSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xs,
   },
-  error: {
-    fontSize: 15,
-    color: '#d1242f',
+  errorTitulo: {
     textAlign: 'center',
   },
-  boton: {
-    backgroundColor: '#1f6feb',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+  errorMensaje: {
+    textAlign: 'center',
+    maxWidth: 300,
+    color: colors.danger,
   },
-  textoBoton: {
-    color: '#ffffff',
-    fontWeight: '600',
+  ayuda: {
+    color: colors.inkMuted,
+  },
+  boton: {
+    marginTop: spacing.sm,
+    minHeight: 48,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: radius.full,
+    backgroundColor: colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   pressed: {
     opacity: 0.6,

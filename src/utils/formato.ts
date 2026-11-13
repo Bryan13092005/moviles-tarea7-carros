@@ -14,10 +14,10 @@ const MESES = [
 ] as const;
 
 /** Precio de catálogo: `$128,900` (sin decimales si el monto es entero). */
-export function formatearPrecio(valor: number): string {
-  const numero = Number.isFinite(valor) ? valor : 0;
+export function formatearPrecio(valor: number | null | undefined): string {
+  if (valor === null || valor === undefined || !Number.isFinite(valor)) return 'Consultar';
 
-  return `$${numero.toLocaleString('es-MX', {
+  return `$${valor.toLocaleString('es-MX', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   })}`;

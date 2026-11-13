@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 
@@ -9,6 +10,9 @@ import { Icon } from './Icon';
 
 /** Insignia derivada del catálogo (no hay columna en la base de datos). */
 export type Insignia = 'DESTACADO' | 'NUEVO';
+
+/** Alto de dos líneas del título, para que todas las tarjetas midan igual. */
+const ALTO_TITULO = text.cardTitle.lineHeight * 2;
 
 type Props = {
   carro: Carro;
@@ -21,28 +25,46 @@ type Props = {
 };
 
 export function CarroCard({ carro, insignia, ancho, onEditar, onAcciones, style }: Props) {
+  // Una URL que 404 deja de ser un hueco con icono: se cae al placeholder.
+  const [imagenFallida, setImagenFallida] = useState(false);
+
+  const marca = carro.marca?.trim() || 'Sin marca';
+  const tipo = carro.tipo?.trim() || 'Vehículo';
+  const anio = Number.isFinite(carro.anio) && carro.anio > 0 ? String(carro.anio) : 's/a';
+  const mostrarImagen = Boolean(carro.imgURL) && !imagenFallida;
+  const precio = formatearPrecio(carro.precio);
+  const tienePrecio = carro.precio !== null && carro.precio !== undefined && Number.isFinite(carro.precio);
+  // Un precio muy largo se compacta en lugar de truncarse (nunca se cortan cifras).
+  const precioCompacto = precio.length > 10;
+
   return (
     <View style={[styles.contenedor, { width: ancho }, style]}>
       <View style={styles.tarjeta}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${carro.marca} ${carro.tipo} ${carro.anio}. Editar vehículo`}
+          accessibilityLabel={`${marca} ${tipo} ${anio}. Editar vehículo`}
           onPress={() => onEditar(carro)}
           style={({ pressed }) => pressed && styles.presionada}
         >
           <View style={styles.media}>
-            {carro.imgURL ? (
+            {mostrarImagen ? (
               <Image
-                source={{ uri: carro.imgURL }}
+                source={{ uri: carro.imgURL as string }}
                 style={StyleSheet.absoluteFill}
                 contentFit="cover"
                 transition={180}
                 cachePolicy="memory-disk"
-                accessibilityLabel={`Foto del ${carro.marca} ${carro.tipo}`}
+                accessibilityLabel={`Foto del ${marca} ${tipo}`}
+                onError={() => setImagenFallida(true)}
               />
             ) : (
               <View style={styles.sinImagen}>
-                <Icon ios="car.fill" android="directions_car" size={26} color={colors.inkSubtle} />
+                <Icon
+                  ios="car.fill"
+                  android="directions_car"
+                  size={26}
+                  color={colors.inkSubtle}
+                />
               </View>
             )}
 
@@ -56,29 +78,36 @@ export function CarroCard({ carro, insignia, ancho, onEditar, onAcciones, style 
           <View style={styles.cuerpo}>
             <View style={styles.filaMarca}>
               <Text style={[text.cardBrand, styles.marca]} numberOfLines={1}>
-                {carro.marca}
+                {marca}
               </Text>
-              <Text style={text.cardMeta}>{carro.anio}</Text>
+              <Text style={[text.cardMeta, styles.anio]}>{anio}</Text>
             </View>
 
-            <Text style={text.cardTitle} numberOfLines={1}>
-              {carro.tipo}
+            <Text style={[text.cardTitle, styles.titulo]} numberOfLines={2}>
+              {tipo}
             </Text>
 
             <View style={styles.divisor} />
 
             <View>
-              <Text style={text.priceLabel}>Desde</Text>
-              <Text style={text.price}>{formatearPrecio(carro.precio)}</Text>
+              {tienePrecio ? <Text style={text.priceLabel}>Desde</Text> : null}
+              <Text
+                style={[text.price, precioCompacto && styles.precioCompacto]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.7}
+              >
+                {precio}
+              </Text>
             </View>
           </View>
         </Pressable>
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Acciones de ${carro.marca} ${carro.tipo}`}
+          accessibilityLabel={`Acciones de ${marca} ${tipo}`}
           onPress={() => onAcciones(carro)}
-          hitSlop={8}
+          hitSlop={10}
           style={({ pressed }) => [styles.menu, pressed && styles.presionada]}
         >
           <Icon ios="ellipsis" android="more_horiz" size={16} color={colors.ink} />
@@ -130,8 +159,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: spacing.sm,
     right: spacing.sm,
-    width: 32,
-    height: 32,
+    width: 36,
+    height: 36,
     borderRadius: radius.full,
     backgroundColor: colors.surface,
     alignItems: 'center',
@@ -152,6 +181,17 @@ const styles = StyleSheet.create({
   },
   marca: {
     flexShrink: 1,
+  },
+  anio: {
+    flexShrink: 0,
+    fontVariant: ['tabular-nums'],
+  },
+  titulo: {
+    minHeight: ALTO_TITULO,
+  },
+  precioCompacto: {
+    fontSize: 15,
+    letterSpacing: -0.2,
   },
   divisor: {
     height: StyleSheet.hairlineWidth,

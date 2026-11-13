@@ -2,6 +2,7 @@ import { Image } from 'expo-image';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { colors, radius, spacing } from '../theme';
 import { analizarNitidez, UMBRAL_NITIDEZ, type ResultadoNitidez } from '../utils/nitidez';
 
 type Estado = 'analizando' | 'nitida' | 'borrosa' | 'error';
@@ -34,6 +35,8 @@ export function VerificarIMG({ uri, umbral = UMBRAL_NITIDEZ, onResultado, onErro
   useEffect(() => {
     let activo = true;
 
+    // Reinicio intencional del análisis al cambiar la URI.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setEstado('analizando');
     setResultado(null);
     setMensajeError(null);
@@ -108,19 +111,20 @@ export function VerificarIMG({ uri, umbral = UMBRAL_NITIDEZ, onResultado, onErro
 
 const styles = StyleSheet.create({
   contenedor: {
-    gap: 8,
+    gap: spacing.sm,
   },
   preview: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#d0d0d0',
-    borderRadius: 8,
+    borderColor: colors.fieldBorder,
+    borderRadius: radius.lg,
+    borderCurve: 'continuous',
     overflow: 'hidden',
   },
   imagen: {
     width: '100%',
     aspectRatio: 4 / 3,
-    backgroundColor: '#eeeeee',
+    backgroundColor: colors.surfaceMuted,
   },
   overlay: {
     position: 'absolute',
@@ -130,62 +134,64 @@ const styles = StyleSheet.create({
     left: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.75)',
+    gap: spacing.sm,
+    backgroundColor: 'rgba(255, 255, 255, 0.78)',
   },
   textoOverlay: {
     fontSize: 14,
-    color: '#333333',
+    color: colors.inkMuted,
     fontWeight: '600',
   },
   estado: {
-    borderRadius: 8,
+    borderRadius: radius.md,
+    borderCurve: 'continuous',
     borderWidth: 1,
-    padding: 10,
+    padding: spacing.md,
     gap: 2,
   },
   estadoOk: {
-    backgroundColor: '#eaf7ee',
-    borderColor: '#a8d5b5',
+    backgroundColor: colors.successSoft,
+    borderColor: colors.successBorder,
   },
   estadoError: {
-    backgroundColor: '#fff0f0',
-    borderColor: '#f2b8bd',
+    backgroundColor: colors.dangerSoft,
+    borderColor: colors.dangerBorder,
   },
   estadoAviso: {
-    backgroundColor: '#fff8e5',
-    borderColor: '#e8d49a',
+    backgroundColor: colors.warningSoft,
+    borderColor: colors.warningBorder,
   },
   textoOk: {
-    color: '#1a6b3c',
+    color: colors.success,
     fontWeight: '600',
     fontSize: 14,
   },
   textoError: {
-    color: '#d1242f',
+    color: colors.danger,
     fontWeight: '600',
     fontSize: 14,
   },
   textoAviso: {
-    color: '#7a5b00',
+    color: colors.warning,
     fontSize: 14,
   },
   textoDetalle: {
-    color: '#666666',
+    color: colors.inkMuted,
     fontSize: 12,
   },
   botonReintentar: {
     alignSelf: 'flex-start',
-    marginTop: 6,
-    borderRadius: 6,
+    marginTop: spacing.xs,
+    borderRadius: radius.md,
+    borderCurve: 'continuous',
     borderWidth: 1,
-    borderColor: '#c4c4c4',
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    borderColor: colors.fieldBorder,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
   textoReintentar: {
-    color: '#333333',
+    color: colors.inkSoft,
     fontWeight: '600',
     fontSize: 13,
   },

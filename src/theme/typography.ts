@@ -71,10 +71,10 @@ export const text = {
   },
   /** Marca en la tarjeta. */
   cardBrand: {
-    fontSize: 10,
+    fontSize: 10.5,
     lineHeight: 14,
     fontWeight: '600',
-    letterSpacing: 1.2,
+    letterSpacing: 1.1,
     color: colors.inkMuted,
     textTransform: 'uppercase',
   },
@@ -95,10 +95,10 @@ export const text = {
   },
   /** "DESDE" sobre el precio. */
   priceLabel: {
-    fontSize: 9.5,
-    lineHeight: 13,
+    fontSize: 10.5,
+    lineHeight: 14,
     fontWeight: '600',
-    letterSpacing: 1.2,
+    letterSpacing: 1.1,
     color: colors.inkSubtle,
     textTransform: 'uppercase',
   },
@@ -113,10 +113,10 @@ export const text = {
   },
   /** Insignia de la tarjeta ("DESTACADO" / "NUEVO"). */
   badge: {
-    fontSize: 9.5,
-    lineHeight: 12,
+    fontSize: 10,
+    lineHeight: 13,
     fontWeight: '700',
-    letterSpacing: 0.9,
+    letterSpacing: 0.8,
     color: colors.onAccent,
   },
   /** Mensajes de estado (vacío, error, ayuda). */
@@ -125,6 +125,27 @@ export const text = {
     lineHeight: 21,
     fontWeight: '400',
     color: colors.inkMuted,
+  },
+  /** Etiqueta de campo del formulario. */
+  label: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
+    color: colors.inkSoft,
+  },
+  /** Campo de texto del formulario. */
+  input: {
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '400',
+    color: colors.ink,
+  },
+  /** Mensaje de error de un campo. */
+  errorText: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '500',
+    color: colors.danger,
   },
   /** Botón con etiqueta. */
   button: {
