@@ -1,50 +1,66 @@
 /**
  * Paleta del catálogo.
  *
- * El diseño es un catálogo claro de vehículos, así que los valores son fijos
- * (no semánticos del sistema): si se usaran colores que se adaptan al modo
- * oscuro, la tarjeta blanca y el texto tinta se romperían en dark mode.
+ * El diseño es un catálogo claro de vehículos con atmósfera botánica/mineral
+ * en la cabecera. Los valores son fijos para preservar el contraste sobre
+ * superficies claras independientemente del modo del sistema.
  *
- * Todos los grises de texto están calibrados para cumplir AA (≥4.5:1) sobre
- * `surface` (blanco) y sobre `background` (#F4F5F3):
- *   inkMuted  #575B57 → 6.08:1 sobre heroWash, 5.85:1 sobre surface
- *   inkSubtle #6B6F6B → 5.11:1 sobre surface,  4.67:1 sobre background
+ * Todos los tonos de texto cumplen AA (≥4.5:1) sobre `surface` (#FFFFFF),
+ * `background` (#F4F5F3) y el lavado orgánico del hero (`heroWash` #E8F0E3):
+ *   ink       #101210 → >15:1
+ *   inkSoft   #252925 → >11:1
+ *   inkBody   #394038 → >8.2:1
+ *   inkMuted  #4E564D → >6.1:1
+ *   inkSubtle #616960 → >4.7:1
  */
 export const colors = {
-  /** Fondo de la pantalla. */
+  /** Fondo general de la pantalla. */
   background: '#F4F5F3',
-  /** Lavado verdoso del hero (extremo superior del degradado). */
-  heroWash: '#EDF2E9',
-  /** Superficie de tarjetas, buscador y chips. */
-  surface: '#FFFFFF',
-  /** Superficie neutra para huecos de imagen y placeholders. */
-  surfaceMuted: '#E9EBE6',
+  /** Lavado base superior del hero. */
+  heroWash: '#E7EFE2',
+  /** Tonos de las ondas orgánicas y manchas difuminadas (SVG). */
+  heroSky: '#DCE9D5',
+  heroGlow: '#D6F865',
+  heroMist: '#D4E6DC',
+  heroSand: '#ECEFE8',
+  heroContour: 'rgba(68, 94, 24, 0.14)',
 
-  /** Texto principal. */
-  ink: '#101010',
-  /** Texto secundario con peso (títulos de tarjeta). */
-  inkSoft: '#2C2E2C',
-  /** Párrafos largos sobre el fondo claro. */
-  inkBody: '#41443F',
+  /** Superficie de tarjetas, buscador y controles elevados. */
+  surface: '#FFFFFF',
+  /** Superficie translúcida de alto contraste sobre el hero. */
+  surfaceElevated: 'rgba(255, 255, 255, 0.94)',
+  /** Superficie neutra para huecos de imagen y placeholders. */
+  surfaceMuted: '#E9ECE6',
+
+  /** Texto principal (tinta con matiz bosque profundo). */
+  ink: '#101210',
+  /** Texto secundario con peso (títulos de tarjeta, controles). */
+  inkSoft: '#252925',
+  /** Párrafos largos sobre el fondo claro o lavado del hero. */
+  inkBody: '#394038',
   /** Texto de apoyo (metadatos, etiquetas, iconos). */
-  inkMuted: '#575B57',
-  /** Etiquetas y texto terciario. */
-  inkSubtle: '#6B6F6B',
+  inkMuted: '#4E564D',
+  /** Placeholders y texto terciario (≥4.7:1 sobre blanco y hero). */
+  inkSubtle: '#616960',
 
   /** Bordes de chips y contenedores. */
-  border: '#E3E5E0',
+  border: '#DFE3DC',
+  /** Borde sutil para controles flotantes sobre las ondas del hero. */
+  heroBorder: '#CFD7CA',
   /** Línea divisoria interna de la tarjeta. */
-  divider: '#ECEDE9',
-  /** Borde de campos de formulario (3.1:1 sobre blanco para delimitar el control). */
-  fieldBorder: '#8F938B',
+  divider: '#EAECE7',
+  /** Borde de campos de formulario (≥3.1:1 sobre blanco). */
+  fieldBorder: '#8A9086',
 
-  /** Verde lima de la insignia ("DESTACADO" / "NUEVO"). */
+  /** Verde lima de la insignia ("DESTACADO" / "NUEVO") y acentos del hero. */
   accent: '#C9F44D',
-  /** Verde de acento para iconografía decorativa (destello del hero). */
-  accentInk: '#6B8E1F',
+  /** Verde profundo para iconografía y detalles sobre fondo claro. */
+  accentInk: '#4D6A12',
+  /** Superficie suave de acento para píldoras del hero. */
+  accentSoft: 'rgba(201, 244, 77, 0.34)',
   /** Texto sobre `accent`. */
-  onAccent: '#101010',
-  /** Texto sobre superficies tinta (botón "Todos", botón de orden). */
+  onAccent: '#101210',
+  /** Texto sobre superficies tinta (`ink`). */
   onInk: '#FFFFFF',
 
   /** Acciones destructivas. */
@@ -64,5 +80,5 @@ export const colors = {
   warningBorder: '#E8D49A',
 
   /** Bloques de carga. */
-  skeleton: '#E5E7E1',
+  skeleton: '#E4E7E0',
 } as const;

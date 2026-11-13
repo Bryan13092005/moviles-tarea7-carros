@@ -1,5 +1,4 @@
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -22,13 +21,14 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useCarros } from '../api/useCarros';
 import { ActionSheet, type SheetOption } from '../components/ActionSheet';
 import { CarroCard } from '../components/CarroCard';
 import type { Insignia } from '../components/CarroCard';
 import { CatalogoSkeleton } from '../components/CatalogoSkeleton';
+import { HeroBackdrop } from '../components/HeroBackdrop';
 import { Icon } from '../components/Icon';
 import { PressableScale } from '../components/PressableScale';
 import {
@@ -61,11 +61,11 @@ const ETIQUETA_ORDEN: Record<Orden, string> = {
 };
 
 /** Constructores de entrada escalonada en ámbito de módulo. */
-const ENTER_BARRA = enterStagger(0, 40);
-const ENTER_HERO = enterStagger(1, 40);
-const ENTER_BUSCADOR = enterStagger(2, 40);
-const ENTER_CHIPS = enterStagger(3, 40);
-const ENTER_SECCION = enterStagger(4, 40);
+const ENTER_BARRA = enterStagger(0, 45);
+const ENTER_HERO = enterStagger(1, 45);
+const ENTER_BUSCADOR = enterStagger(2, 45);
+const ENTER_CHIPS = enterStagger(3, 45);
+const ENTER_SECCION = enterStagger(4, 45);
 
 function ordenarCarros(lista: Carro[], orden: Orden): Carro[] {
   if (orden === 'recientes') return lista;
@@ -153,19 +153,20 @@ function EncabezadoCatalogo({
   const ordenPersonalizado = orden !== 'recientes';
 
   return (
-    <LinearGradient
-      colors={[colors.heroWash, colors.background]}
-      locations={[0, 0.9]}
-      style={[styles.hero, { paddingTop: topInset + spacing.sm }]}
-    >
+    <View style={[styles.hero, { paddingTop: topInset + spacing.sm }]}>
+      <HeroBackdrop variant="hero" />
+
       <Animated.View entering={ENTER_BARRA} style={styles.barra}>
         <View style={styles.identidad}>
           <View style={styles.logo}>
-            <Icon ios="car.fill" android="directions_car" size={20} color={colors.onInk} />
+            <Icon ios="car.fill" android="directions_car" size={19} color={colors.accent} />
           </View>
-          <View>
-            <Text style={text.eyebrow}>Movilidad</Text>
+          <View style={styles.identidadTextos}>
             <Text style={text.barTitle}>Catálogo</Text>
+            <View style={styles.pildoraMes}>
+              <View style={styles.puntoVivo} />
+              <Text style={styles.textoPildoraMes}>{mesActual()}</Text>
+            </View>
           </View>
         </View>
 
@@ -173,21 +174,19 @@ function EncabezadoCatalogo({
           accessibilityRole="button"
           accessibilityLabel="Agregar vehículo"
           onPress={onCrear}
-          scaleTo={0.93}
+          scaleTo={0.95}
           haptic="light"
           hitSlop={6}
-          contentStyle={styles.botonRedondo}
+          contentStyle={styles.botonNuevo}
         >
-          <Icon ios="plus" android="add" size={18} color={colors.ink} />
+          <View style={styles.iconoNuevoCirculo}>
+            <Icon ios="plus" android="add" size={14} color={colors.onAccent} />
+          </View>
+          <Text style={styles.textoBotonNuevo}>Nuevo</Text>
         </PressableScale>
       </Animated.View>
 
       <Animated.View entering={ENTER_HERO} style={styles.heroTexto}>
-        <View style={styles.filaEyebrow}>
-          <Icon ios="sparkles" android="auto_awesome" size={13} color={colors.accentInk} />
-          <Text style={text.eyebrow}>Selección curada · {mesActual()}</Text>
-        </View>
-
         <Text style={text.hero}>
           Tu próximo auto,{'\n'}
           <Text style={text.heroMuted}>sin rodeos.</Text>
@@ -205,7 +204,7 @@ function EncabezadoCatalogo({
           <TextInput
             value={busqueda}
             onChangeText={onBuscar}
-            placeholder="Marca, modelo o tipo"
+            placeholder="Buscar por marca o carrocería…"
             placeholderTextColor={colors.inkSubtle}
             keyboardType="default"
             autoCapitalize="none"
@@ -277,10 +276,14 @@ function EncabezadoCatalogo({
 
       <Animated.View entering={ENTER_SECCION} style={styles.seccionFila}>
         <View style={styles.seccion}>
-          <Text style={text.eyebrow}>
-            Catálogo disponible · {ETIQUETA_ORDEN[orden]}
-          </Text>
-          <Text style={text.sectionTitle}>{contarVehiculos(total)}</Text>
+          <View style={styles.filaTituloSeccion}>
+            <Text style={text.sectionTitle} selectable>
+              {contarVehiculos(total)}
+            </Text>
+            <View style={styles.pildoraOrdenActual}>
+              <Text style={styles.textoOrdenActual}>{ETIQUETA_ORDEN[orden]}</Text>
+            </View>
+          </View>
         </View>
 
         <View style={styles.accionesSeccion}>
@@ -317,7 +320,7 @@ function EncabezadoCatalogo({
           </PressableScale>
         </View>
       </Animated.View>
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -584,7 +587,7 @@ export default function IndexScreen() {
   const hayFiltros = busqueda.trim().length > 0 || chipActivo !== TODOS;
 
   return (
-    <View style={styles.pantalla}>
+    <SafeAreaView style={styles.pantalla} edges={['left', 'right']}>
       <StatusBar style="dark" />
 
       <Animated.FlatList<Carro>
@@ -681,7 +684,6 @@ export default function IndexScreen() {
       {/* Hoja de estilo para ordenar y filtrar el catálogo */}
       <ActionSheet
         visible={menuOrdenAbierto}
-        eyebrow="Criterio de visualización"
         title="Ordenar vehículos"
         subtitle="Elige el orden en el que quieres explorar el catálogo disponible."
         options={opcionesOrden}
@@ -692,7 +694,6 @@ export default function IndexScreen() {
       {/* Hoja de estilo para las acciones de cada tarjeta (...) y confirmación de borrado */}
       <ActionSheet
         visible={carroAcciones !== null}
-        eyebrow={confirmandoEliminar ? 'Acción irreversible' : 'Gestión de unidad'}
         title={confirmandoEliminar ? '¿Eliminar este vehículo?' : 'Opciones del vehículo'}
         subtitle={
           confirmandoEliminar && carroAcciones
@@ -758,7 +759,7 @@ export default function IndexScreen() {
           </View>
         ) : null}
       </ActionSheet>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -777,11 +778,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
 
-  // Hero / encabezado
+  // Hero / encabezado con composición orgánica SVG
   hero: {
     marginHorizontal: -spacing.lg,
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.lg,
+    position: 'relative',
   },
   barra: {
     flexDirection: 'row',
@@ -792,34 +794,68 @@ const styles = StyleSheet.create({
   identidad: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.sm + 2,
   },
   logo: {
     width: 44,
     height: 44,
-    borderRadius: radius.md,
+    borderRadius: radius.md + 2,
     borderCurve: 'continuous',
     backgroundColor: colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
+    boxShadow: shadows.soft,
   },
-  botonRedondo: {
-    width: 44,
-    height: 44,
+  identidadTextos: {
+    gap: 2,
+  },
+  pildoraMes: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  puntoVivo: {
+    width: 6,
+    height: 6,
     borderRadius: radius.full,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.accentInk,
+  },
+  textoPildoraMes: {
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: '600',
+    color: colors.inkMuted,
+    textTransform: 'capitalize',
+  },
+  botonNuevo: {
+    height: 44,
+    paddingLeft: spacing.sm + 2,
+    paddingRight: spacing.md + 2,
+    borderRadius: radius.full,
+    backgroundColor: colors.ink,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    boxShadow: shadows.soft,
+  },
+  iconoNuevoCirculo: {
+    width: 26,
+    height: 26,
+    borderRadius: radius.full,
+    backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: shadows.soft,
+  },
+  textoBotonNuevo: {
+    fontSize: 14,
+    lineHeight: 18,
+    fontWeight: '700',
+    color: colors.onInk,
   },
   heroTexto: {
     marginTop: spacing.xl,
     gap: spacing.sm,
-  },
-  filaEyebrow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
+    maxWidth: 520,
   },
   filaBuscador: {
     flexDirection: 'row',
@@ -837,12 +873,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
     borderCurve: 'continuous',
-    boxShadow: shadows.soft,
+    borderWidth: 1,
+    borderColor: colors.heroBorder,
+    boxShadow: shadows.searchDock,
   },
   input: {
     flex: 1,
     paddingVertical: spacing.md,
     fontSize: text.search.fontSize,
+    fontWeight: text.search.fontWeight,
     color: colors.ink,
   },
   botonOrden: {
@@ -853,6 +892,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
+    boxShadow: shadows.searchDock,
   },
   puntoOrdenActivo: {
     position: 'absolute',
@@ -884,8 +924,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     borderRadius: radius.full,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: colors.heroBorder,
+    backgroundColor: colors.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -896,12 +936,32 @@ const styles = StyleSheet.create({
   seccionFila: {
     marginTop: spacing.lg,
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.md,
   },
   seccion: {
-    gap: spacing.xxs,
+    flex: 1,
+  },
+  filaTituloSeccion: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  pildoraOrdenActual: {
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 4,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.heroBorder,
+  },
+  textoOrdenActual: {
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: '600',
+    color: colors.inkMuted,
   },
   accionesSeccion: {
     flexDirection: 'row',
@@ -914,7 +974,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.heroBorder,
   },
   textoRecarga: {
     fontSize: 12,
@@ -922,12 +982,12 @@ const styles = StyleSheet.create({
     color: colors.inkMuted,
   },
   botonRecarga: {
-    width: 36,
-    height: 36,
+    width: 38,
+    height: 38,
     borderRadius: radius.full,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.heroBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },

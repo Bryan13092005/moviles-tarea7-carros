@@ -4,20 +4,21 @@ import { colors } from './colors';
 
 /**
  * Estilos de texto del catálogo. Las pantallas no declaran `fontSize`:
- * usan uno de estos pasos.
+ * usan uno de estos pasos con contraste verificado (≥4.5:1 AA).
  */
 export const text = {
-  /** Titular del hero ("Tu próximo auto, / sin rodeos."). */
+  /** Titular principal del hero ("Tu próximo auto, / sin rodeos."). */
   hero: {
     fontSize: 34,
-    lineHeight: 37,
-    fontWeight: '700',
-    letterSpacing: -1.5,
+    lineHeight: 38,
+    fontWeight: '800',
+    letterSpacing: -1.1,
     color: colors.ink,
   },
-  /** Segunda línea del hero, en gris. */
+  /** Segunda línea del hero, con tinte mineral legible sobre el fondo orgánico. */
   heroMuted: {
-    color: colors.inkSubtle,
+    color: colors.inkMuted,
+    fontWeight: '700',
   },
   /** Párrafo de apoyo bajo el hero. */
   lead: {
@@ -26,43 +27,44 @@ export const text = {
     fontWeight: '400',
     color: colors.inkBody,
   },
-  /** Etiquetas en mayúsculas con tracking amplio. */
+  /** Etiquetas contextuales breves. */
   eyebrow: {
-    fontSize: 10.5,
+    fontSize: 11,
     lineHeight: 14,
     fontWeight: '600',
-    letterSpacing: 1.6,
+    letterSpacing: 0.9,
     color: colors.inkMuted,
     textTransform: 'uppercase',
   },
   /** Encabezado de sección ("6 vehículos"). */
   sectionTitle: {
-    fontSize: 19,
-    lineHeight: 24,
+    fontSize: 20,
+    lineHeight: 25,
     fontWeight: '700',
     letterSpacing: -0.4,
     color: colors.ink,
+    fontVariant: ['tabular-nums'],
   },
   /** Título de bloque compacto (identidad de la app en la barra superior). */
   barTitle: {
-    fontSize: 17,
-    lineHeight: 21,
+    fontSize: 18,
+    lineHeight: 22,
     fontWeight: '700',
-    letterSpacing: -0.3,
+    letterSpacing: -0.35,
     color: colors.ink,
   },
   /** Texto del buscador. */
   search: {
     fontSize: 15,
     lineHeight: 20,
-    fontWeight: '400',
+    fontWeight: '500',
     color: colors.ink,
   },
   /** Chips de filtro. */
   chip: {
     fontSize: 14,
     lineHeight: 18,
-    fontWeight: '500',
+    fontWeight: '600',
     color: colors.inkSoft,
   },
   chipActive: {
@@ -71,10 +73,10 @@ export const text = {
   },
   /** Marca en la tarjeta. */
   cardBrand: {
-    fontSize: 10.5,
+    fontSize: 11,
     lineHeight: 14,
     fontWeight: '600',
-    letterSpacing: 1.1,
+    letterSpacing: 0.8,
     color: colors.inkMuted,
     textTransform: 'uppercase',
   },
@@ -82,7 +84,7 @@ export const text = {
   cardMeta: {
     fontSize: 12,
     lineHeight: 16,
-    fontWeight: '400',
+    fontWeight: '500',
     color: colors.inkSubtle,
   },
   /** Tipo de vehículo, título de la tarjeta. */
@@ -98,7 +100,7 @@ export const text = {
     fontSize: 10.5,
     lineHeight: 14,
     fontWeight: '600',
-    letterSpacing: 1.1,
+    letterSpacing: 0.8,
     color: colors.inkSubtle,
     textTransform: 'uppercase',
   },
@@ -116,7 +118,7 @@ export const text = {
     fontSize: 10,
     lineHeight: 13,
     fontWeight: '700',
-    letterSpacing: 0.8,
+    letterSpacing: 0.6,
     color: colors.onAccent,
   },
   /** Mensajes de estado (vacío, error, ayuda). */
