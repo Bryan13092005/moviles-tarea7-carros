@@ -1,11 +1,10 @@
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
-  FlatList,
-  Pressable,
+  ActivityIndicator,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -14,20 +13,59 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useCarros } from '../api/useCarros';
+import { ActionSheet, type SheetOption } from '../components/ActionSheet';
 import { CarroCard } from '../components/CarroCard';
 import type { Insignia } from '../components/CarroCard';
 import { CatalogoSkeleton } from '../components/CatalogoSkeleton';
 import { Icon } from '../components/Icon';
-import { colors, radius, shadows, spacing, text } from '../theme';
+import { PressableScale } from '../components/PressableScale';
+import {
+  colors,
+  ENTER_DOWN,
+  ENTER_DOWN_FAST,
+  ENTER_FADE,
+  enterStagger,
+  EXIT_DOWN,
+  EXIT_FADE,
+  EXIT_UP,
+  LAYOUT_SPRING,
+  radius,
+  shadows,
+  spacing,
+  text,
+  triggerHaptic,
+} from '../theme';
 import type { Carro } from '../types/carro';
-import { contarVehiculos, mesActual, normalizarTexto } from '../utils/formato';
+import { contarVehiculos, formatearPrecio, mesActual, normalizarTexto } from '../utils/formato';
 
 const TODOS = 'Todos';
 
 type Orden = 'recientes' | 'menor-precio' | 'mayor-precio';
+
+const ETIQUETA_ORDEN: Record<Orden, string> = {
+  recientes: 'Más recientes',
+  'menor-precio': 'Menor precio',
+  'mayor-precio': 'Mayor precio',
+};
+
+/** Constructores de entrada escalonada en ámbito de módulo. */
+const ENTER_BARRA = enterStagger(0, 40);
+const ENTER_HERO = enterStagger(1, 40);
+const ENTER_BUSCADOR = enterStagger(2, 40);
+const ENTER_CHIPS = enterStagger(3, 40);
+const ENTER_SECCION = enterStagger(4, 40);
 
 function ordenarCarros(lista: Carro[], orden: Orden): Carro[] {
   if (orden === 'recientes') return lista;
@@ -62,8 +100,11 @@ type EncabezadoProps = {
   chips: string[];
   chipActivo: string;
   onChip: (chip: string) => void;
+  orden: Orden;
   onCrear: () => void;
   onOrdenar: () => void;
+  onRecargar: () => void;
+  refreshing: boolean;
   total: number;
 };
 
@@ -74,17 +115,50 @@ function EncabezadoCatalogo({
   chips,
   chipActivo,
   onChip,
+  orden,
   onCrear,
   onOrdenar,
+  onRecargar,
+  refreshing,
   total,
 }: EncabezadoProps) {
+  const reducedMotion = useReducedMotion();
+  const rotacion = useSharedValue(0);
+
+  useEffect(() => {
+    if (!refreshing || reducedMotion) {
+      cancelAnimation(rotacion);
+      rotacion.set(0);
+      return;
+    }
+
+    rotacion.set(0);
+    rotacion.set(
+      withRepeat(
+        withTiming(360, { duration: 750, easing: Easing.linear }),
+        -1,
+        false,
+      ),
+    );
+
+    return () => {
+      cancelAnimation(rotacion);
+    };
+  }, [refreshing, reducedMotion, rotacion]);
+
+  const iconoGiroStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rotacion.get()}deg` }],
+  }));
+
+  const ordenPersonalizado = orden !== 'recientes';
+
   return (
     <LinearGradient
       colors={[colors.heroWash, colors.background]}
       locations={[0, 0.9]}
       style={[styles.hero, { paddingTop: topInset + spacing.sm }]}
     >
-      <View style={styles.barra}>
+      <Animated.View entering={ENTER_BARRA} style={styles.barra}>
         <View style={styles.identidad}>
           <View style={styles.logo}>
             <Icon ios="car.fill" android="directions_car" size={20} color={colors.onInk} />
@@ -95,18 +169,20 @@ function EncabezadoCatalogo({
           </View>
         </View>
 
-        <Pressable
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel="Agregar vehículo"
           onPress={onCrear}
+          scaleTo={0.93}
+          haptic="light"
           hitSlop={6}
-          style={({ pressed }) => [styles.botonRedondo, pressed && styles.presionado]}
+          contentStyle={styles.botonRedondo}
         >
           <Icon ios="plus" android="add" size={18} color={colors.ink} />
-        </Pressable>
-      </View>
+        </PressableScale>
+      </Animated.View>
 
-      <View style={styles.heroTexto}>
+      <Animated.View entering={ENTER_HERO} style={styles.heroTexto}>
         <View style={styles.filaEyebrow}>
           <Icon ios="sparkles" android="auto_awesome" size={13} color={colors.accentInk} />
           <Text style={text.eyebrow}>Selección curada · {mesActual()}</Text>
@@ -121,9 +197,9 @@ function EncabezadoCatalogo({
           Vehículos verificados, precios transparentes y una experiencia diseñada para decidir
           mejor.
         </Text>
-      </View>
+      </Animated.View>
 
-      <View style={styles.filaBuscador}>
+      <Animated.View entering={ENTER_BUSCADOR} style={styles.filaBuscador}>
         <View style={styles.buscador}>
           <Icon ios="magnifyingglass" android="search" size={19} color={colors.inkMuted} />
           <TextInput
@@ -140,60 +216,107 @@ function EncabezadoCatalogo({
             style={styles.input}
           />
           {busqueda ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Borrar búsqueda"
-              onPress={() => onBuscar('')}
-              hitSlop={6}
-              style={styles.botonLimpiar}
-            >
-              <Icon ios="xmark.circle.fill" android="cancel" size={18} color={colors.inkSubtle} />
-            </Pressable>
+            <Animated.View entering={ENTER_FADE} exiting={EXIT_FADE}>
+              <PressableScale
+                accessibilityRole="button"
+                accessibilityLabel="Borrar búsqueda"
+                onPress={() => onBuscar('')}
+                scaleTo={0.9}
+                haptic="selection"
+                hitSlop={6}
+                contentStyle={styles.botonLimpiar}
+              >
+                <Icon ios="xmark.circle.fill" android="cancel" size={18} color={colors.inkSubtle} />
+              </PressableScale>
+            </Animated.View>
           ) : null}
         </View>
 
-        <Pressable
+        <PressableScale
           accessibilityRole="button"
-          accessibilityLabel="Ordenar vehículos"
+          accessibilityLabel={`Ordenar vehículos. Actual: ${ETIQUETA_ORDEN[orden]}`}
           onPress={onOrdenar}
-          style={({ pressed }) => [styles.botonOrden, pressed && styles.presionado]}
+          scaleTo={0.94}
+          haptic="light"
+          contentStyle={styles.botonOrden}
         >
           <Icon ios="slider.horizontal.3" android="tune" size={20} color={colors.onInk} />
-        </Pressable>
-      </View>
+          {ordenPersonalizado ? <View style={styles.puntoOrdenActivo} /> : null}
+        </PressableScale>
+      </Animated.View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        style={styles.chipsDesborde}
-        contentContainerStyle={styles.chips}
-      >
-        {chips.map((chip) => {
-          const activo = chip === chipActivo;
+      <Animated.View entering={ENTER_CHIPS}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          style={styles.chipsDesborde}
+          contentContainerStyle={styles.chips}
+        >
+          {chips.map((chip) => {
+            const activo = chip === chipActivo;
 
-          return (
-            <Pressable
-              key={chip}
-              accessibilityRole="button"
-              accessibilityState={{ selected: activo }}
-              onPress={() => onChip(chip)}
-              style={({ pressed }) => [
-                styles.chip,
-                activo && styles.chipActivo,
-                pressed && styles.presionado,
-              ]}
+            return (
+              <PressableScale
+                key={chip}
+                accessibilityRole="button"
+                accessibilityState={{ selected: activo }}
+                onPress={() => onChip(chip)}
+                scaleTo={0.95}
+                haptic="selection"
+                hapticOn="pressIn"
+                hitSlop={4}
+                contentStyle={[styles.chip, activo && styles.chipActivo]}
+              >
+                <Text style={[text.chip, activo && text.chipActive]}>{chip}</Text>
+              </PressableScale>
+            );
+          })}
+        </ScrollView>
+      </Animated.View>
+
+      <Animated.View entering={ENTER_SECCION} style={styles.seccionFila}>
+        <View style={styles.seccion}>
+          <Text style={text.eyebrow}>
+            Catálogo disponible · {ETIQUETA_ORDEN[orden]}
+          </Text>
+          <Text style={text.sectionTitle}>{contarVehiculos(total)}</Text>
+        </View>
+
+        <View style={styles.accionesSeccion}>
+          {refreshing ? (
+            <Animated.View
+              entering={ENTER_FADE}
+              exiting={EXIT_FADE}
+              style={styles.pildoraRecarga}
+              accessibilityLiveRegion="polite"
             >
-              <Text style={[text.chip, activo && text.chipActive]}>{chip}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+              <Text style={styles.textoRecarga}>Actualizando</Text>
+            </Animated.View>
+          ) : null}
 
-      <View style={styles.seccion}>
-        <Text style={text.eyebrow}>Catálogo disponible</Text>
-        <Text style={text.sectionTitle}>{contarVehiculos(total)}</Text>
-      </View>
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityLabel={refreshing ? 'Actualizando catálogo' : 'Recargar catálogo'}
+            accessibilityState={{ busy: refreshing }}
+            onPress={onRecargar}
+            disabled={refreshing}
+            scaleTo={0.92}
+            haptic="light"
+            hitSlop={8}
+            contentStyle={styles.botonRecarga}
+          >
+            <Animated.View style={iconoGiroStyle}>
+              <Icon
+                ios="arrow.clockwise"
+                android="autorenew"
+                size={17}
+                color={refreshing ? colors.ink : colors.inkMuted}
+              />
+            </Animated.View>
+          </PressableScale>
+        </View>
+      </Animated.View>
     </LinearGradient>
   );
 }
@@ -209,7 +332,7 @@ type EstadoProps = {
 
 function EstadoCatalogo({ ios, android, titulo, mensaje, accion, onAccion }: EstadoProps) {
   return (
-    <View style={styles.estado}>
+    <Animated.View entering={ENTER_DOWN} exiting={EXIT_DOWN} style={styles.estado}>
       <View style={styles.estadoIcono}>
         <Icon ios={ios} android={android} size={24} color={colors.inkMuted} />
       </View>
@@ -217,13 +340,51 @@ function EstadoCatalogo({ ios, android, titulo, mensaje, accion, onAccion }: Est
       <Text style={[text.body, styles.estadoMensaje]} selectable>
         {mensaje}
       </Text>
-      <Pressable
+      <PressableScale
         accessibilityRole="button"
         onPress={onAccion}
-        style={({ pressed }) => [styles.botonAccion, pressed && styles.presionado]}
+        haptic="light"
+        contentStyle={styles.botonAccion}
       >
         <Text style={text.button}>{accion}</Text>
-      </Pressable>
+      </PressableScale>
+    </Animated.View>
+  );
+}
+
+function ResumenCarroSheet({ carro }: { carro: Carro }) {
+  const marca = carro.marca?.trim() || 'Sin marca';
+  const tipo = carro.tipo?.trim() || 'Vehículo';
+  const anio = Number.isFinite(carro.anio) && carro.anio > 0 ? String(carro.anio) : 's/a';
+  const precio = formatearPrecio(carro.precio);
+
+  return (
+    <View style={styles.resumenCarro}>
+      <View style={styles.resumenMiniatura}>
+        {carro.imgURL ? (
+          <Image
+            source={{ uri: carro.imgURL }}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            transition={150}
+          />
+        ) : (
+          <Icon ios="car.fill" android="directions_car" size={20} color={colors.inkSubtle} />
+        )}
+      </View>
+
+      <View style={styles.resumenTextos}>
+        <Text style={text.cardBrand} numberOfLines={1}>
+          {marca} · {anio}
+        </Text>
+        <Text style={styles.resumenTipo} numberOfLines={1}>
+          {tipo}
+        </Text>
+      </View>
+
+      <View style={styles.resumenPrecioPildora}>
+        <Text style={styles.resumenPrecioTexto}>{precio}</Text>
+      </View>
     </View>
   );
 }
@@ -237,6 +398,12 @@ export default function IndexScreen() {
   const [busqueda, setBusqueda] = useState('');
   const [tipoActivo, setTipoActivo] = useState(TODOS);
   const [orden, setOrden] = useState<Orden>('recientes');
+  const [menuOrdenAbierto, setMenuOrdenAbierto] = useState(false);
+  const [carroAcciones, setCarroAcciones] = useState<Carro | null>(null);
+  const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
+  const [errorAccion, setErrorAccion] = useState<string | null>(null);
+
   const esPrimerFoco = useRef(true);
 
   const anchoTarjeta = Math.max(120, (width - spacing.lg * 2 - spacing.md) / 2);
@@ -291,64 +458,125 @@ export default function IndexScreen() {
     [router],
   );
 
-  const manejarEliminar = useCallback(
-    async (carro: Carro) => {
-      try {
-        await eliminarCarro(carro.id);
-      } catch (e) {
-        Alert.alert(
-          'No se pudo eliminar',
-          e instanceof Error ? e.message : 'Ocurrió un error inesperado.',
-        );
-      }
-    },
-    [eliminarCarro],
-  );
-
-  const confirmarEliminar = useCallback(
-    (carro: Carro) => {
-      Alert.alert(
-        'Eliminar vehículo',
-        `¿Deseas eliminar el ${carro.marca} ${carro.tipo} ${carro.anio}? Esta acción no se puede deshacer.`,
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          {
-            text: 'Eliminar',
-            style: 'destructive',
-            onPress: () => {
-              void manejarEliminar(carro);
-            },
-          },
-        ],
-      );
-    },
-    [manejarEliminar],
-  );
-
-  const abrirAcciones = useCallback(
-    (carro: Carro) => {
-      Alert.alert(`${carro.marca} ${carro.tipo}`, `Año ${carro.anio}`, [
-        { text: 'Editar', onPress: () => irAEditar(carro) },
-        { text: 'Eliminar', style: 'destructive', onPress: () => confirmarEliminar(carro) },
-        { text: 'Cancelar', style: 'cancel' },
-      ]);
-    },
-    [confirmarEliminar, irAEditar],
-  );
-
-  // Se mantienen tres opciones para que el diálogo nativo funcione igual en Android.
-  const abrirOrden = useCallback(() => {
-    Alert.alert('Ordenar vehículos', 'Elige el criterio del catálogo.', [
-      { text: 'Más recientes', onPress: () => setOrden('recientes') },
-      { text: 'Menor precio', onPress: () => setOrden('menor-precio') },
-      { text: 'Mayor precio', onPress: () => setOrden('mayor-precio') },
-    ]);
+  const abrirAcciones = useCallback((carro: Carro) => {
+    setConfirmandoEliminar(false);
+    setErrorAccion(null);
+    setCarroAcciones(carro);
   }, []);
+
+  const cerrarAcciones = useCallback(() => {
+    if (eliminando) return;
+    setCarroAcciones(null);
+    setConfirmandoEliminar(false);
+    setErrorAccion(null);
+  }, [eliminando]);
+
+  const manejarEliminarConfirmado = useCallback(async () => {
+    if (!carroAcciones || eliminando) return;
+
+    setEliminando(true);
+    setErrorAccion(null);
+    try {
+      await eliminarCarro(carroAcciones.id);
+      triggerHaptic('success');
+      setCarroAcciones(null);
+      setConfirmandoEliminar(false);
+    } catch (e) {
+      triggerHaptic('error');
+      setErrorAccion(
+        e instanceof Error ? e.message : 'No se pudo eliminar el vehículo. Inténtalo de nuevo.',
+      );
+    } finally {
+      setEliminando(false);
+    }
+  }, [carroAcciones, eliminarCarro, eliminando]);
+
+  const abrirOrden = useCallback(() => {
+    setMenuOrdenAbierto(true);
+  }, []);
+
+  const opcionesOrden = useMemo<SheetOption[]>(
+    () => [
+      {
+        id: 'recientes',
+        label: 'Más recientes',
+        description: 'Últimos vehículos registrados en el catálogo',
+        ios: 'clock.fill',
+        android: 'schedule',
+        active: orden === 'recientes',
+        onPress: () => {
+          setOrden('recientes');
+          setMenuOrdenAbierto(false);
+        },
+      },
+      {
+        id: 'menor-precio',
+        label: 'Menor precio',
+        description: 'Ordena de las opciones más accesibles a mayor valor',
+        ios: 'arrow.down.right',
+        android: 'south_east',
+        active: orden === 'menor-precio',
+        onPress: () => {
+          setOrden('menor-precio');
+          setMenuOrdenAbierto(false);
+        },
+      },
+      {
+        id: 'mayor-precio',
+        label: 'Mayor precio',
+        description: 'Muestra los vehículos de gama más alta primero',
+        ios: 'arrow.up.right',
+        android: 'north_east',
+        active: orden === 'mayor-precio',
+        onPress: () => {
+          setOrden('mayor-precio');
+          setMenuOrdenAbierto(false);
+        },
+      },
+    ],
+    [orden],
+  );
+
+  const opcionesCarro = useMemo<SheetOption[]>(() => {
+    if (!carroAcciones || confirmandoEliminar) return [];
+
+    return [
+      {
+        id: 'editar',
+        label: 'Editar vehículo',
+        description: 'Modificar marca, modelo, año, precio o fotografía',
+        ios: 'pencil',
+        android: 'edit',
+        onPress: () => {
+          const objetivo = carroAcciones;
+          setCarroAcciones(null);
+          irAEditar(objetivo);
+        },
+      },
+      {
+        id: 'eliminar',
+        label: 'Eliminar del catálogo',
+        description: 'Borrar permanentemente este vehículo y su imagen',
+        ios: 'trash',
+        android: 'delete',
+        destructive: true,
+        onPress: () => {
+          setErrorAccion(null);
+          setConfirmandoEliminar(true);
+        },
+      },
+    ];
+  }, [carroAcciones, confirmandoEliminar, irAEditar]);
 
   const limpiarFiltros = useCallback(() => {
     setBusqueda('');
     setTipoActivo(TODOS);
   }, []);
+
+  const manejarRecarga = useCallback(() => {
+    triggerHaptic('light');
+    void refrescar();
+  }, [refrescar]);
 
   const cargando = loading && carros.length === 0;
   const errorSinDatos = !loading && !carros.length && error !== null;
@@ -359,11 +587,12 @@ export default function IndexScreen() {
     <View style={styles.pantalla}>
       <StatusBar style="dark" />
 
-      <FlatList<Carro>
+      <Animated.FlatList<Carro>
         data={cargando || errorSinDatos ? [] : visibles}
         keyExtractor={(item) => String(item.id)}
         numColumns={2}
         columnWrapperStyle={styles.fila}
+        itemLayoutAnimation={LAYOUT_SPRING}
         renderItem={({ item }) => (
           <CarroCard
             carro={item}
@@ -382,13 +611,16 @@ export default function IndexScreen() {
               chips={chips}
               chipActivo={chipActivo}
               onChip={setTipoActivo}
+              orden={orden}
               onCrear={irACrear}
               onOrdenar={abrirOrden}
+              onRecargar={manejarRecarga}
+              refreshing={refreshing}
               total={visibles.length}
             />
 
             {error && carros.length > 0 ? (
-              <View style={styles.aviso}>
+              <Animated.View entering={ENTER_DOWN_FAST} exiting={EXIT_UP} style={styles.aviso}>
                 <Icon
                   ios="exclamationmark.triangle.fill"
                   android="warning"
@@ -398,7 +630,7 @@ export default function IndexScreen() {
                 <Text style={styles.avisoTexto} selectable>
                   {error}
                 </Text>
-              </View>
+              </Animated.View>
             ) : null}
           </>
         }
@@ -439,12 +671,93 @@ export default function IndexScreen() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => void refrescar()}
+            onRefresh={manejarRecarga}
             tintColor={colors.inkMuted}
             colors={[colors.ink]}
           />
         }
       />
+
+      {/* Hoja de estilo para ordenar y filtrar el catálogo */}
+      <ActionSheet
+        visible={menuOrdenAbierto}
+        eyebrow="Criterio de visualización"
+        title="Ordenar vehículos"
+        subtitle="Elige el orden en el que quieres explorar el catálogo disponible."
+        options={opcionesOrden}
+        cancelLabel="Listo"
+        onClose={() => setMenuOrdenAbierto(false)}
+      />
+
+      {/* Hoja de estilo para las acciones de cada tarjeta (...) y confirmación de borrado */}
+      <ActionSheet
+        visible={carroAcciones !== null}
+        eyebrow={confirmandoEliminar ? 'Acción irreversible' : 'Gestión de unidad'}
+        title={confirmandoEliminar ? '¿Eliminar este vehículo?' : 'Opciones del vehículo'}
+        subtitle={
+          confirmandoEliminar && carroAcciones
+            ? `El ${carroAcciones.marca} ${carroAcciones.tipo} (${carroAcciones.anio}) se borrará del catálogo de forma permanente.`
+            : 'Selecciona una acción rápida para esta unidad.'
+        }
+        header={carroAcciones ? <ResumenCarroSheet carro={carroAcciones} /> : undefined}
+        options={opcionesCarro}
+        onClose={cerrarAcciones}
+      >
+        {confirmandoEliminar ? (
+          <View style={styles.confirmacionContenedor}>
+            {errorAccion ? (
+              <Animated.View entering={ENTER_DOWN_FAST} exiting={EXIT_UP} style={styles.avisoModal}>
+                <Icon
+                  ios="exclamationmark.triangle.fill"
+                  android="warning"
+                  size={15}
+                  color={colors.danger}
+                />
+                <Text style={styles.avisoTexto} selectable>
+                  {errorAccion}
+                </Text>
+              </Animated.View>
+            ) : null}
+
+            <View style={styles.confirmacionBotones}>
+              <PressableScale
+                accessibilityRole="button"
+                onPress={() => {
+                  setErrorAccion(null);
+                  setConfirmandoEliminar(false);
+                }}
+                disabled={eliminando}
+                haptic="selection"
+                style={styles.botonModalWrapper}
+                contentStyle={styles.botonModalSecundario}
+              >
+                <Text style={styles.textoModalSecundario}>Volver</Text>
+              </PressableScale>
+
+              <PressableScale
+                accessibilityRole="button"
+                onPress={() => void manejarEliminarConfirmado()}
+                disabled={eliminando}
+                accessibilityState={{ disabled: eliminando, busy: eliminando }}
+                haptic="medium"
+                style={styles.botonModalWrapper}
+                contentStyle={styles.botonModalPeligro}
+              >
+                <View style={styles.filaBotonPeligro}>
+                  {eliminando ? (
+                    <ActivityIndicator size="small" color={colors.onInk} />
+                  ) : (
+                    <Icon ios="trash" android="delete" size={16} color={colors.onInk} />
+                  )}
+                  <Text style={styles.textoModalPeligro}>
+                    {eliminando ? 'Eliminando...' : 'Sí, eliminar'}
+                  </Text>
+                </View>
+              </PressableScale>
+            </View>
+          </View>
+        ) : null}
+      </ActionSheet>
     </View>
   );
 }
@@ -541,6 +854,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  puntoOrdenActivo: {
+    position: 'absolute',
+    top: 11,
+    right: 11,
+    width: 8,
+    height: 8,
+    borderRadius: radius.full,
+    backgroundColor: colors.accent,
+  },
   botonLimpiar: {
     width: 32,
     height: 32,
@@ -571,9 +893,43 @@ const styles = StyleSheet.create({
     backgroundColor: colors.ink,
     borderColor: colors.ink,
   },
-  seccion: {
+  seccionFila: {
     marginTop: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  seccion: {
     gap: spacing.xxs,
+  },
+  accionesSeccion: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  pildoraRecarga: {
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 4,
+    borderRadius: radius.full,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  textoRecarga: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.inkMuted,
+  },
+  botonRecarga: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.full,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Estados
@@ -620,7 +976,106 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     color: colors.danger,
   },
-  presionado: {
-    opacity: 0.6,
+
+  // Cabecera y confirmación dentro de ActionSheet
+  resumenCarro: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.sm + 2,
+    borderRadius: radius.lg,
+    borderCurve: 'continuous',
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  resumenMiniatura: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.md,
+    borderCurve: 'continuous',
+    backgroundColor: colors.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  resumenTextos: {
+    flex: 1,
+    gap: 2,
+  },
+  resumenTipo: {
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  resumenPrecioPildora: {
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 6,
+    borderRadius: radius.full,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  resumenPrecioTexto: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.ink,
+    fontVariant: ['tabular-nums'],
+  },
+  confirmacionContenedor: {
+    gap: spacing.md,
+    marginTop: spacing.xs,
+  },
+  avisoModal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    borderCurve: 'continuous',
+    backgroundColor: colors.dangerSoft,
+    borderWidth: 1,
+    borderColor: colors.dangerBorder,
+  },
+  confirmacionBotones: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  botonModalWrapper: {
+    flex: 1,
+  },
+  botonModalSecundario: {
+    minHeight: 48,
+    borderRadius: radius.lg,
+    borderCurve: 'continuous',
+    backgroundColor: colors.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  botonModalPeligro: {
+    minHeight: 48,
+    borderRadius: radius.lg,
+    borderCurve: 'continuous',
+    backgroundColor: colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filaBotonPeligro: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs + 2,
+  },
+  textoModalSecundario: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.inkSoft,
+  },
+  textoModalPeligro: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.onInk,
   },
 });

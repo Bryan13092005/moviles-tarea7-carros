@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { FlatList, Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { Text, View, useWindowDimensions } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import { CarroCard } from '../../components/CarroCard';
-import { colors, radius, spacing, text } from '../../theme';
+import { PressableScale } from '../../components/PressableScale';
+import { colors, ENTER_DOWN, LAYOUT_SPRING, radius, spacing, text } from '../../theme';
 import type { Carro } from '../../types/carro';
 
 /**
@@ -84,22 +86,25 @@ export default function BreakScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <FlatList
+      <Animated.FlatList
         data={actual.datos}
         keyExtractor={(item) => String(item.id)}
         numColumns={2}
         columnWrapperStyle={{ gap: spacing.md, marginBottom: spacing.md }}
+        itemLayoutAnimation={LAYOUT_SPRING}
         contentContainerStyle={{
           paddingHorizontal: spacing.lg,
           paddingTop: spacing.lg,
           paddingBottom: 120,
         }}
-        renderItem={({ item }) => <CarroCard carro={item} ancho={ancho} onEditar={() => {}} onAcciones={() => {}} />}
+        renderItem={({ item }) => (
+          <CarroCard carro={item} ancho={ancho} onEditar={() => {}} onAcciones={() => {}} />
+        )}
         ListEmptyComponent={
-          <View style={{ padding: spacing.xl, gap: spacing.sm }}>
+          <Animated.View entering={ENTER_DOWN} style={{ padding: spacing.xl, gap: spacing.sm }}>
             <Text style={text.sectionTitle}>Sin vehículos</Text>
             <Text style={text.body}>Este es el estado vacío del catálogo.</Text>
-          </View>
+          </Animated.View>
         }
       />
 
@@ -107,17 +112,21 @@ export default function BreakScreen() {
         {ESTADOS.map((e) => {
           const activo = e.clave === estado;
           return (
-            <Pressable
+            <PressableScale
               key={e.clave}
               accessibilityRole="button"
               accessibilityState={{ selected: activo }}
               onPress={() => setEstado(e.clave)}
-              style={[styles.segmento, activo && styles.segmentoActivo]}
+              scaleTo={0.95}
+              haptic="selection"
+              hapticOn="pressIn"
+              hitSlop={4}
+              contentStyle={[styles.segmento, activo && styles.segmentoActivo]}
             >
               <Text style={[styles.textoSegmento, activo && styles.textoSegmentoActivo]}>
                 {e.etiqueta}
               </Text>
-            </Pressable>
+            </PressableScale>
           );
         })}
       </View>

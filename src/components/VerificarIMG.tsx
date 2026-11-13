@@ -1,9 +1,30 @@
 import { Image } from 'expo-image';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  cancelAnimation,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 
-import { colors, radius, spacing } from '../theme';
+import {
+  colors,
+  EASE_IN_OUT,
+  ENTER_DOWN_FAST,
+  ENTER_FADE,
+  EXIT_FADE,
+  EXIT_UP,
+  LAYOUT_SPRING,
+  radius,
+  spacing,
+  triggerHaptic,
+} from '../theme';
 import { analizarNitidez, UMBRAL_NITIDEZ, type ResultadoNitidez } from '../utils/nitidez';
+import { PressableScale } from './PressableScale';
 
 type Estado = 'analizando' | 'nitida' | 'borrosa' | 'error';
 
@@ -24,6 +45,9 @@ export function VerificarIMG({ uri, umbral = UMBRAL_NITIDEZ, onResultado, onErro
   const [mensajeError, setMensajeError] = useState<string | null>(null);
   const [intento, setIntento] = useState(0);
 
+  const reducedMotion = useReducedMotion();
+  const pulso = useSharedValue(1);
+
   // Se guardan en refs para no reiniciar el análisis en cada render del padre.
   const onResultadoRef = useRef(onResultado);
   const onErrorRef = useRef(onError);
@@ -31,6 +55,32 @@ export function VerificarIMG({ uri, umbral = UMBRAL_NITIDEZ, onResultado, onErro
     onResultadoRef.current = onResultado;
     onErrorRef.current = onError;
   }, [onResultado, onError]);
+
+  useEffect(() => {
+    if (estado !== 'analizando' || reducedMotion) {
+      pulso.set(1);
+      return;
+    }
+
+    pulso.set(
+      withRepeat(
+        withSequence(
+          withTiming(0.96, { duration: 520, easing: EASE_IN_OUT }),
+          withTiming(1, { duration: 520, easing: EASE_IN_OUT }),
+        ),
+        -1,
+        false,
+      ),
+    );
+
+    return () => {
+      cancelAnimation(pulso);
+    };
+  }, [estado, pulso, reducedMotion]);
+
+  const badgePulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulso.get() }],
+  }));
 
   useEffect(() => {
     let activo = true;
@@ -46,6 +96,7 @@ export function VerificarIMG({ uri, umbral = UMBRAL_NITIDEZ, onResultado, onErro
         if (!activo) return;
         setResultado(r);
         setEstado(r.esBorrosa ? 'borrosa' : 'nitida');
+        triggerHaptic(r.esBorrosa ? 'warning' : 'success');
         onResultadoRef.current?.(r);
       })
       .catch((e: unknown) => {
@@ -53,6 +104,7 @@ export function VerificarIMG({ uri, umbral = UMBRAL_NITIDEZ, onResultado, onErro
         const mensaje = e instanceof Error ? e.message : 'No se pudo analizar la imagen.';
         setMensajeError(mensaje);
         setEstado('error');
+        triggerHaptic('error');
         onErrorRef.current?.(mensaje);
       });
 
@@ -62,27 +114,37 @@ export function VerificarIMG({ uri, umbral = UMBRAL_NITIDEZ, onResultado, onErro
   }, [uri, umbral, intento]);
 
   return (
-    <View style={styles.contenedor}>
+    <Animated.View layout={LAYOUT_SPRING} style={styles.contenedor}>
       <View style={styles.preview}>
-        <Image source={{ uri }} style={styles.imagen} contentFit="cover" />
+        <Image source={{ uri }} style={styles.imagen} contentFit="cover" transition={180} />
 
         {estado === 'analizando' ? (
-          <View style={styles.overlay}>
-            <ActivityIndicator />
-            <Text style={styles.textoOverlay}>Analizando nitidez...</Text>
-          </View>
+          <Animated.View entering={ENTER_FADE} exiting={EXIT_FADE} style={styles.overlay}>
+            <Animated.View style={[styles.pildoraCarga, badgePulseStyle]}>
+              <ActivityIndicator color={colors.ink} />
+              <Text style={styles.textoOverlay}>Analizando nitidez...</Text>
+            </Animated.View>
+          </Animated.View>
         ) : null}
       </View>
 
       {estado === 'nitida' && resultado ? (
-        <View style={[styles.estado, styles.estadoOk]}>
+        <Animated.View
+          entering={ENTER_DOWN_FAST}
+          exiting={EXIT_UP}
+          style={[styles.estado, styles.estadoOk]}
+        >
           <Text style={styles.textoOk}>Imagen nítida</Text>
           <Text style={styles.textoDetalle}>Nitidez: {Math.round(resultado.puntuacion)}</Text>
-        </View>
+        </Animated.View>
       ) : null}
 
       {estado === 'borrosa' && resultado ? (
-        <View style={[styles.estado, styles.estadoError]}>
+        <Animated.View
+          entering={ENTER_DOWN_FAST}
+          exiting={EXIT_UP}
+          style={[styles.estado, styles.estadoError]}
+        >
           <Text style={styles.textoError}>
             Imagen borrosa: no se puede subir. Toma otra foto con mejor luz y sin mover el
             teléfono.
@@ -90,22 +152,28 @@ export function VerificarIMG({ uri, umbral = UMBRAL_NITIDEZ, onResultado, onErro
           <Text style={styles.textoDetalle}>
             Nitidez: {Math.round(resultado.puntuacion)} (mínimo {Math.round(resultado.umbral)})
           </Text>
-        </View>
+        </Animated.View>
       ) : null}
 
       {estado === 'error' ? (
-        <View style={[styles.estado, styles.estadoAviso]}>
+        <Animated.View
+          entering={ENTER_DOWN_FAST}
+          exiting={EXIT_UP}
+          style={[styles.estado, styles.estadoAviso]}
+        >
           <Text style={styles.textoAviso}>No se pudo verificar la nitidez: {mensajeError}</Text>
-          <Pressable
+          <PressableScale
             accessibilityRole="button"
             onPress={() => setIntento((n) => n + 1)}
-            style={({ pressed }) => [styles.botonReintentar, pressed && styles.pressed]}
+            haptic="selection"
+            style={styles.botonReintentarContenedor}
+            contentStyle={styles.botonReintentar}
           >
             <Text style={styles.textoReintentar}>Reintentar análisis</Text>
-          </Pressable>
-        </View>
+          </PressableScale>
+        </Animated.View>
       ) : null}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -134,12 +202,22 @@ const styles = StyleSheet.create({
     left: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
     backgroundColor: 'rgba(255, 255, 255, 0.78)',
+  },
+  pildoraCarga: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: radius.full,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   textoOverlay: {
     fontSize: 14,
-    color: colors.inkMuted,
+    color: colors.inkSoft,
     fontWeight: '600',
   },
   estado: {
@@ -179,9 +257,11 @@ const styles = StyleSheet.create({
     color: colors.inkMuted,
     fontSize: 12,
   },
-  botonReintentar: {
+  botonReintentarContenedor: {
     alignSelf: 'flex-start',
     marginTop: spacing.xs,
+  },
+  botonReintentar: {
     borderRadius: radius.md,
     borderCurve: 'continuous',
     borderWidth: 1,
@@ -194,8 +274,5 @@ const styles = StyleSheet.create({
     color: colors.inkSoft,
     fontWeight: '600',
     fontSize: 13,
-  },
-  pressed: {
-    opacity: 0.6,
   },
 });

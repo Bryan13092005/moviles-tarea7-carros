@@ -1,11 +1,17 @@
-import { useEffect, useState } from 'react';
-import { Animated, StyleSheet, View } from 'react-native';
+import { useEffect } from 'react';
+import { StyleSheet, View } from 'react-native';
 import type { DimensionValue } from 'react-native';
+import Animated, {
+  cancelAnimation,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 
-import { colors, radius, spacing } from '../theme';
-
-/** `useNativeDriver` no existe en web: ahí la animación cae a JS sin ruido en consola. */
-const USAR_DRIVER_NATIVO = process.env.EXPO_OS !== 'web';
+import { colors, EASE_IN_OUT, ENTER_FADE, EXIT_FADE, radius, spacing } from '../theme';
 
 type Props = {
   /** Ancho de cada columna, para que el esqueleto mida igual que las tarjetas. */
@@ -28,47 +34,62 @@ function Bloque({ alto, ancho }: { alto: number; ancho: DimensionValue }) {
 }
 
 /**
- * Estado de carga del catálogo: tarjetas vacías con la misma geometría que
- * `CarroCard`, para que la cuadrícula no salte al llegar los datos.
+ * Estado de carga del catálogo en el UI thread con Reanimated:
+ * tarjetas vacías con la misma geometría que `CarroCard`, para que la cuadrícula
+ * no salte al llegar los datos y el pulso siga corriendo aunque el hilo JS trabaje.
  */
 export function CatalogoSkeleton({ ancho, filas = 2 }: Props) {
-  const [opacidad] = useState(() => new Animated.Value(0.55));
+  const reducedMotion = useReducedMotion();
+  const opacidad = useSharedValue(0.6);
 
   useEffect(() => {
-    const pulso = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacidad, {
-          toValue: 1,
-          duration: 700,
-          useNativeDriver: USAR_DRIVER_NATIVO,
-        }),
-        Animated.timing(opacidad, {
-          toValue: 0.55,
-          duration: 700,
-          useNativeDriver: USAR_DRIVER_NATIVO,
-        }),
-      ]),
+    if (reducedMotion) {
+      opacidad.set(0.8);
+      return;
+    }
+
+    opacidad.set(
+      withRepeat(
+        withSequence(
+          withTiming(1, { duration: 680, easing: EASE_IN_OUT }),
+          withTiming(0.52, { duration: 680, easing: EASE_IN_OUT }),
+        ),
+        -1,
+        false,
+      ),
     );
 
-    pulso.start();
-    return () => pulso.stop();
-  }, [opacidad]);
+    return () => {
+      cancelAnimation(opacidad);
+    };
+  }, [opacidad, reducedMotion]);
+
+  const pulseStyle = useAnimatedStyle(() => ({
+    opacity: opacidad.get(),
+  }));
 
   return (
-    <View style={{ gap: spacing.md }} accessibilityLabel="Cargando vehículos">
+    <Animated.View
+      entering={ENTER_FADE}
+      exiting={EXIT_FADE}
+      style={{ gap: spacing.md }}
+      accessibilityLabel="Cargando vehículos"
+    >
       {Array.from({ length: filas }, (_, fila) => (
         <View key={fila} style={{ flexDirection: 'row', gap: spacing.md }}>
           {[0, 1].map((columna) => (
             <Animated.View
               key={columna}
-              style={{
-                width: ancho,
-                opacity: opacidad,
-                backgroundColor: colors.surface,
-                borderRadius: radius.lg,
-                borderCurve: 'continuous',
-                overflow: 'hidden',
-              }}
+              style={[
+                {
+                  width: ancho,
+                  backgroundColor: colors.surface,
+                  borderRadius: radius.lg,
+                  borderCurve: 'continuous',
+                  overflow: 'hidden',
+                },
+                pulseStyle,
+              ]}
             >
               <View
                 style={{
@@ -87,6 +108,6 @@ export function CatalogoSkeleton({ ancho, filas = 2 }: Props) {
           ))}
         </View>
       ))}
-    </View>
+    </Animated.View>
   );
 }

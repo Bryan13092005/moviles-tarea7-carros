@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,12 +11,35 @@ import {
   View,
 } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { eliminarImagenPorUrl, subirImagenCarro } from '../api/storage.service';
 import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
-import { colors, radius, spacing, text } from '../theme';
+import {
+  colors,
+  EASE_OUT,
+  ENTER_DOWN_FAST,
+  ENTER_FADE,
+  enterStagger,
+  EXIT_FADE,
+  EXIT_UP,
+  LAYOUT_SPRING,
+  radius,
+  spacing,
+  SPRING_SNAP,
+  text,
+  triggerHaptic,
+} from '../theme';
 import type { NuevoCarro } from '../types/carro';
+import { PressableScale } from './PressableScale';
 import { VerificarIMG } from './VerificarIMG';
 
 type Props = {
@@ -39,6 +61,14 @@ const LIMITE_MARCA = 60;
 const LIMITE_TIPO = 60;
 const LIMITE_PRECIO = 12;
 
+/** Constructores de entrada escalonada en ámbito de módulo. */
+const ENTER_CAMPO_0 = enterStagger(0);
+const ENTER_CAMPO_1 = enterStagger(1);
+const ENTER_CAMPO_2 = enterStagger(2);
+const ENTER_CAMPO_3 = enterStagger(3);
+const ENTER_CAMPO_4 = enterStagger(4);
+const ENTER_ACCIONES = enterStagger(5);
+
 function textoInicial(valor: number | string | undefined): string {
   if (valor === undefined || valor === null) return '';
   return String(valor);
@@ -46,6 +76,7 @@ function textoInicial(valor: number | string | undefined): string {
 
 export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, onCancel }: Props) {
   const insets = useSafeAreaInsets();
+  const reducedMotion = useReducedMotion();
 
   const [tipo, setTipo] = useState(textoInicial(initialValues?.tipo));
   const [marca, setMarca] = useState(textoInicial(initialValues?.marca));
@@ -64,6 +95,25 @@ export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, on
   const [errores, setErrores] = useState<Errores>({});
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+
+  // Sacudida horizontal en el UI thread cuando falla la validación o el envío.
+  const shakeX = useSharedValue(0);
+  const shakeStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: shakeX.get() }],
+  }));
+
+  function dispararSacudidaError() {
+    triggerHaptic('error');
+    if (reducedMotion) return;
+    shakeX.set(
+      withSequence(
+        withTiming(-7, { duration: 55, easing: EASE_OUT }),
+        withTiming(7, { duration: 55, easing: EASE_OUT }),
+        withTiming(-4, { duration: 50, easing: EASE_OUT }),
+        withSpring(0, SPRING_SNAP),
+      ),
+    );
+  }
 
   // Desplazamiento del formulario: se guarda la posición de cada campo para
   // poder subirlo por encima del teclado al enfocarlo.
@@ -158,6 +208,7 @@ export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, on
 
     const permiso = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permiso.granted) {
+      triggerHaptic('warning');
       Alert.alert('Permiso requerido', 'Necesitamos acceso a tus fotos para elegir una imagen.');
       return;
     }
@@ -173,6 +224,7 @@ export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, on
 
       if (!resultado.canceled) aplicarSeleccion(resultado.assets[0]);
     } catch (e) {
+      triggerHaptic('error');
       Alert.alert('Error', e instanceof Error ? e.message : 'No se pudo abrir la galería.');
     } finally {
       setProcesandoImagen(false);
@@ -184,6 +236,7 @@ export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, on
 
     const permiso = await ImagePicker.requestCameraPermissionsAsync();
     if (!permiso.granted) {
+      triggerHaptic('warning');
       Alert.alert('Permiso requerido', 'Necesitamos acceso a la cámara para tomar una foto.');
       return;
     }
@@ -198,6 +251,7 @@ export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, on
 
       if (!resultado.canceled) aplicarSeleccion(resultado.assets[0]);
     } catch (e) {
+      triggerHaptic('error');
       Alert.alert('Error', e instanceof Error ? e.message : 'No se pudo abrir la cámara.');
     } finally {
       setProcesandoImagen(false);
@@ -218,16 +272,21 @@ export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, on
     setErrores(erroresValidacion);
     setErrorEnvio(null);
 
-    if (!valores) return;
+    if (!valores) {
+      dispararSacudidaError();
+      return;
+    }
 
     // La subida al bucket se bloquea si la imagen no pasó la verificación.
     if (imagenLocal) {
       if (verificacion === 'analizando') {
         setErrorEnvio('Espera a que termine la verificación de la imagen.');
+        dispararSacudidaError();
         return;
       }
       if (verificacion === 'borrosa') {
         setErrorEnvio('La imagen está borrosa: toma o elige otra para poder guardar.');
+        dispararSacudidaError();
         return;
       }
     }
@@ -248,12 +307,14 @@ export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, on
       }
 
       await onSubmit({ ...valores, imgURL });
+      triggerHaptic('success');
     } catch (e) {
       // Si la imagen se subió pero el guardado falló, se evita dejarla huérfana.
       if (urlSubida) {
         void eliminarImagenPorUrl(urlSubida).catch(() => undefined);
       }
       setErrorEnvio(e instanceof Error ? e.message : 'No se pudo guardar el carro.');
+      dispararSacudidaError();
     } finally {
       setEnviando(false);
     }
@@ -263,13 +324,16 @@ export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, on
     <View style={styles.container}>
       <ScrollView
         ref={scroll}
-        contentContainerStyle={[styles.contenido, { paddingBottom: 16 + alturaTeclado + insets.bottom }]}
+        contentContainerStyle={[
+          styles.contenido,
+          { paddingBottom: 16 + alturaTeclado + insets.bottom },
+        ]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode={process.env.EXPO_OS === 'ios' ? 'interactive' : 'on-drag'}
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.campo}>
+        <Animated.View entering={ENTER_CAMPO_0} style={styles.campo}>
           <Text style={text.label}>Imagen del carro</Text>
 
           {imagenLocal ? (
@@ -283,7 +347,12 @@ export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, on
           ) : (
             <View style={styles.imagenContenedor}>
               {imagenVisible ? (
-                <Image source={{ uri: imagenVisible }} style={styles.imagen} contentFit="cover" />
+                <Image
+                  source={{ uri: imagenVisible }}
+                  style={styles.imagen}
+                  contentFit="cover"
+                  transition={180}
+                />
               ) : (
                 <View style={styles.imagenVacia}>
                   <Text style={styles.textoImagenVacia}>Sin imagen</Text>
@@ -291,56 +360,62 @@ export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, on
               )}
 
               {procesandoImagen ? (
-                <View style={styles.cargandoImagen}>
+                <Animated.View
+                  entering={ENTER_FADE}
+                  exiting={EXIT_FADE}
+                  style={styles.cargandoImagen}
+                >
                   <ActivityIndicator color={colors.inkMuted} />
-                </View>
+                </Animated.View>
               ) : null}
             </View>
           )}
 
-          <View style={styles.accionesImagen}>
-            <Pressable
+          <Animated.View layout={LAYOUT_SPRING} style={styles.accionesImagen}>
+            <PressableScale
               accessibilityRole="button"
-              onPress={elegirDesdeGaleria}
+              onPress={() => void elegirDesdeGaleria()}
               disabled={ocupado}
-              style={({ pressed }) => [
-                styles.botonImagen,
-                (pressed || ocupado) && styles.pressed,
-              ]}
+              haptic="selection"
+              style={styles.botonImagenWrapper}
+              contentStyle={styles.botonImagen}
             >
               <Text style={styles.textoBotonImagen}>Galería</Text>
-            </Pressable>
+            </PressableScale>
 
-            <Pressable
+            <PressableScale
               accessibilityRole="button"
-              onPress={tomarFoto}
+              onPress={() => void tomarFoto()}
               disabled={ocupado}
-              style={({ pressed }) => [
-                styles.botonImagen,
-                (pressed || ocupado) && styles.pressed,
-              ]}
+              haptic="selection"
+              style={styles.botonImagenWrapper}
+              contentStyle={styles.botonImagen}
             >
               <Text style={styles.textoBotonImagen}>Cámara</Text>
-            </Pressable>
+            </PressableScale>
 
             {imagenVisible ? (
-              <Pressable
-                accessibilityRole="button"
-                onPress={quitar}
-                disabled={ocupado}
-                style={({ pressed }) => [
-                  styles.botonImagen,
-                  styles.botonQuitar,
-                  (pressed || ocupado) && styles.pressed,
-                ]}
+              <Animated.View
+                entering={ENTER_FADE}
+                exiting={EXIT_FADE}
+                style={styles.botonImagenWrapper}
               >
-                <Text style={styles.textoQuitar}>Quitar</Text>
-              </Pressable>
+                <PressableScale
+                  accessibilityRole="button"
+                  onPress={quitar}
+                  disabled={ocupado}
+                  haptic="medium"
+                  contentStyle={[styles.botonImagen, styles.botonQuitar]}
+                >
+                  <Text style={styles.textoQuitar}>Quitar</Text>
+                </PressableScale>
+              </Animated.View>
             ) : null}
-          </View>
-        </View>
+          </Animated.View>
+        </Animated.View>
 
-        <View
+        <Animated.View
+          entering={ENTER_CAMPO_1}
           style={styles.campo}
           onLayout={(evento: LayoutChangeEvent) => {
             posiciones.current.marca = evento.nativeEvent.layout.y;
@@ -366,13 +441,19 @@ export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, on
             editable={!ocupado}
           />
           {errores.marca ? (
-            <Text style={text.errorText} accessibilityLiveRegion="polite">
+            <Animated.Text
+              entering={ENTER_DOWN_FAST}
+              exiting={EXIT_UP}
+              style={text.errorText}
+              accessibilityLiveRegion="polite"
+            >
               {errores.marca}
-            </Text>
+            </Animated.Text>
           ) : null}
-        </View>
+        </Animated.View>
 
-        <View
+        <Animated.View
+          entering={ENTER_CAMPO_2}
           style={styles.campo}
           onLayout={(evento: LayoutChangeEvent) => {
             posiciones.current.tipo = evento.nativeEvent.layout.y;
@@ -398,13 +479,19 @@ export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, on
             editable={!ocupado}
           />
           {errores.tipo ? (
-            <Text style={text.errorText} accessibilityLiveRegion="polite">
+            <Animated.Text
+              entering={ENTER_DOWN_FAST}
+              exiting={EXIT_UP}
+              style={text.errorText}
+              accessibilityLiveRegion="polite"
+            >
               {errores.tipo}
-            </Text>
+            </Animated.Text>
           ) : null}
-        </View>
+        </Animated.View>
 
-        <View
+        <Animated.View
+          entering={ENTER_CAMPO_3}
           style={styles.campo}
           onLayout={(evento: LayoutChangeEvent) => {
             posiciones.current.anio = evento.nativeEvent.layout.y;
@@ -430,13 +517,19 @@ export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, on
             editable={!ocupado}
           />
           {errores.anio ? (
-            <Text style={text.errorText} accessibilityLiveRegion="polite">
+            <Animated.Text
+              entering={ENTER_DOWN_FAST}
+              exiting={EXIT_UP}
+              style={text.errorText}
+              accessibilityLiveRegion="polite"
+            >
               {errores.anio}
-            </Text>
+            </Animated.Text>
           ) : null}
-        </View>
+        </Animated.View>
 
-        <View
+        <Animated.View
+          entering={ENTER_CAMPO_4}
           style={styles.campo}
           onLayout={(evento: LayoutChangeEvent) => {
             posiciones.current.precio = evento.nativeEvent.layout.y;
@@ -462,50 +555,62 @@ export function CarroForm({ initialValues, submitLabel = 'Guardar', onSubmit, on
             editable={!ocupado}
           />
           {errores.precio ? (
-            <Text style={text.errorText} accessibilityLiveRegion="polite">
+            <Animated.Text
+              entering={ENTER_DOWN_FAST}
+              exiting={EXIT_UP}
+              style={text.errorText}
+              accessibilityLiveRegion="polite"
+            >
               {errores.precio}
-            </Text>
+            </Animated.Text>
           ) : null}
-        </View>
+        </Animated.View>
 
         {errorEnvio ? (
-          <Text style={styles.errorEnvio} accessibilityLiveRegion="assertive" selectable>
+          <Animated.Text
+            entering={ENTER_DOWN_FAST}
+            exiting={EXIT_UP}
+            style={styles.errorEnvio}
+            accessibilityLiveRegion="assertive"
+            selectable
+          >
             {errorEnvio}
-          </Text>
+          </Animated.Text>
         ) : null}
 
-        <View style={styles.acciones}>
-          {onCancel ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={onCancel}
-              disabled={ocupado}
-              style={({ pressed }) => [
-                styles.boton,
-                styles.botonSecundario,
-                (pressed || ocupado) && styles.pressed,
-              ]}
-            >
-              <Text style={styles.textoSecundario}>Cancelar</Text>
-            </Pressable>
-          ) : null}
+        <Animated.View entering={ENTER_ACCIONES}>
+          <Animated.View style={[styles.acciones, shakeStyle]}>
+            {onCancel ? (
+              <PressableScale
+                accessibilityRole="button"
+                onPress={onCancel}
+                disabled={ocupado}
+                haptic="selection"
+                style={styles.botonWrapper}
+                contentStyle={[styles.boton, styles.botonSecundario]}
+              >
+                <Text style={styles.textoSecundario}>Cancelar</Text>
+              </PressableScale>
+            ) : null}
 
-          <Pressable
-            accessibilityRole="button"
-            onPress={manejarEnvio}
-            disabled={ocupado}
-            accessibilityState={{ disabled: ocupado, busy: enviando }}
-            style={({ pressed }) => [
-              styles.boton,
-              styles.botonPrimario,
-              (pressed || ocupado) && styles.pressed,
-            ]}
-          >
-            <Text style={styles.textoPrimario}>
-              {enviando ? 'Guardando...' : submitLabel}
-            </Text>
-          </Pressable>
-        </View>
+            <PressableScale
+              accessibilityRole="button"
+              onPress={() => void manejarEnvio()}
+              disabled={ocupado}
+              accessibilityState={{ disabled: ocupado, busy: enviando }}
+              haptic="light"
+              style={styles.botonWrapper}
+              contentStyle={[styles.boton, styles.botonPrimario]}
+            >
+              <View style={styles.filaPrimario}>
+                {enviando ? <ActivityIndicator size="small" color={colors.onInk} /> : null}
+                <Text style={styles.textoPrimario}>
+                  {enviando ? 'Guardando...' : submitLabel}
+                </Text>
+              </View>
+            </PressableScale>
+          </Animated.View>
+        </Animated.View>
       </ScrollView>
     </View>
   );
@@ -590,8 +695,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
   },
-  botonImagen: {
+  botonImagenWrapper: {
     flex: 1,
+  },
+  botonImagen: {
     minHeight: 44,
     paddingVertical: spacing.md,
     borderRadius: radius.md,
@@ -621,8 +728,10 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginTop: spacing.sm,
   },
-  boton: {
+  botonWrapper: {
     flex: 1,
+  },
+  boton: {
     minHeight: 50,
     paddingVertical: spacing.md,
     borderRadius: radius.md,
@@ -639,6 +748,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderColor: colors.fieldBorder,
   },
+  filaPrimario: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
   textoPrimario: {
     color: colors.onInk,
     fontWeight: '600',
@@ -648,8 +763,5 @@ const styles = StyleSheet.create({
     color: colors.inkSoft,
     fontWeight: '600',
     fontSize: 16,
-  },
-  pressed: {
-    opacity: 0.6,
   },
 });

@@ -1,13 +1,24 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { carrosService } from '../../api/supabase.service';
 import { useCarros } from '../../api/useCarros';
 import { CarroForm } from '../../components/CarroForm';
 import { Icon } from '../../components/Icon';
-import { colors, radius, spacing, text } from '../../theme';
+import { PressableScale } from '../../components/PressableScale';
+import {
+  colors,
+  ENTER_DOWN,
+  ENTER_FADE,
+  EXIT_FADE,
+  radius,
+  spacing,
+  text,
+  triggerHaptic,
+} from '../../theme';
 import type { Carro, NuevoCarro } from '../../types/carro';
 
 export default function EditarCarroScreen() {
@@ -30,6 +41,7 @@ export default function EditarCarroScreen() {
         if (activo) {
           setError('El identificador del carro no es válido.');
           setLoading(false);
+          triggerHaptic('error');
         }
         return;
       }
@@ -43,6 +55,7 @@ export default function EditarCarroScreen() {
       } catch (e) {
         if (activo) {
           setError(e instanceof Error ? e.message : 'No se pudo cargar el carro.');
+          triggerHaptic('error');
         }
       } finally {
         if (activo) setLoading(false);
@@ -70,16 +83,24 @@ export default function EditarCarroScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.centrado, { paddingTop: insets.top + spacing.xxl }]}>
+      <Animated.View
+        entering={ENTER_FADE}
+        exiting={EXIT_FADE}
+        style={[styles.centrado, { paddingTop: insets.top + spacing.xxl }]}
+      >
         <ActivityIndicator size="large" color={colors.inkMuted} />
         <Text style={[text.body, styles.ayuda]}>Cargando carro...</Text>
-      </View>
+      </Animated.View>
     );
   }
 
   if (error || !carro) {
     return (
-      <View style={[styles.centrado, { paddingTop: insets.top + spacing.xxl }]}>
+      <Animated.View
+        entering={ENTER_DOWN}
+        exiting={EXIT_FADE}
+        style={[styles.centrado, { paddingTop: insets.top + spacing.xxl }]}
+      >
         <View style={styles.estadoIcono}>
           <Icon
             ios="exclamationmark.triangle.fill"
@@ -92,14 +113,15 @@ export default function EditarCarroScreen() {
         <Text style={[text.body, styles.errorMensaje]} selectable>
           {error ?? 'No se encontró el carro.'}
         </Text>
-        <Pressable
+        <PressableScale
           accessibilityRole="button"
           onPress={cancelar}
-          style={({ pressed }) => [styles.boton, pressed && styles.pressed]}
+          haptic="light"
+          contentStyle={styles.boton}
         >
           <Text style={text.button}>Volver</Text>
-        </Pressable>
-      </View>
+        </PressableScale>
+      </Animated.View>
     );
   }
 
@@ -152,8 +174,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  pressed: {
-    opacity: 0.6,
   },
 });

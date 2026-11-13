@@ -1,12 +1,14 @@
 import { Image } from 'expo-image';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
+import Animated from 'react-native-reanimated';
 
-import { colors, radius, shadows, spacing, text } from '../theme';
+import { colors, ENTER_DOWN_FAST, radius, shadows, spacing, text } from '../theme';
 import type { Carro } from '../types/carro';
 import { formatearPrecio } from '../utils/formato';
 import { Icon } from './Icon';
+import { PressableScale } from './PressableScale';
 
 /** Insignia derivada del catálogo (no hay columna en la base de datos). */
 export type Insignia = 'DESTACADO' | 'NUEVO';
@@ -33,19 +35,24 @@ export function CarroCard({ carro, insignia, ancho, onEditar, onAcciones, style 
   const anio = Number.isFinite(carro.anio) && carro.anio > 0 ? String(carro.anio) : 's/a';
   const mostrarImagen = Boolean(carro.imgURL) && !imagenFallida;
   const precio = formatearPrecio(carro.precio);
-  const tienePrecio = carro.precio !== null && carro.precio !== undefined && Number.isFinite(carro.precio);
+  const tienePrecio =
+    carro.precio !== null && carro.precio !== undefined && Number.isFinite(carro.precio);
   // Un precio muy largo se compacta en lugar de truncarse (nunca se cortan cifras).
   const precioCompacto = precio.length > 10;
 
   return (
-    <View style={[styles.contenedor, { width: ancho }, style]}>
-      <View style={styles.tarjeta}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${marca} ${tipo} ${anio}. Editar vehículo`}
-          onPress={() => onEditar(carro)}
-          style={({ pressed }) => pressed && styles.presionada}
-        >
+    <View style={[{ width: ancho }, style]}>
+      <PressableScale
+        accessibilityRole="button"
+        accessibilityLabel={`${marca} ${tipo} ${anio}. Editar vehículo`}
+        onPress={() => onEditar(carro)}
+        onLongPress={() => onAcciones(carro)}
+        scaleTo={0.975}
+        haptic="light"
+        hitSlop={2}
+        contentStyle={styles.contenedor}
+      >
+        <View style={styles.tarjeta}>
           <View style={styles.media}>
             {mostrarImagen ? (
               <Image
@@ -69,9 +76,9 @@ export function CarroCard({ carro, insignia, ancho, onEditar, onAcciones, style 
             )}
 
             {insignia ? (
-              <View style={styles.insignia}>
+              <Animated.View entering={ENTER_DOWN_FAST} style={styles.insignia}>
                 <Text style={text.badge}>{insignia}</Text>
-              </View>
+              </Animated.View>
             ) : null}
           </View>
 
@@ -101,18 +108,21 @@ export function CarroCard({ carro, insignia, ancho, onEditar, onAcciones, style 
               </Text>
             </View>
           </View>
-        </Pressable>
+        </View>
+      </PressableScale>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Acciones de ${marca} ${tipo}`}
-          onPress={() => onAcciones(carro)}
-          hitSlop={10}
-          style={({ pressed }) => [styles.menu, pressed && styles.presionada]}
-        >
-          <Icon ios="ellipsis" android="more_horiz" size={16} color={colors.ink} />
-        </Pressable>
-      </View>
+      <PressableScale
+        accessibilityRole="button"
+        accessibilityLabel={`Acciones de ${marca} ${tipo}`}
+        onPress={() => onAcciones(carro)}
+        scaleTo={0.92}
+        haptic="selection"
+        hitSlop={10}
+        style={styles.menuPosicion}
+        contentStyle={styles.menu}
+      >
+        <Icon ios="ellipsis" android="more_horiz" size={16} color={colors.ink} />
+      </PressableScale>
     </View>
   );
 }
@@ -128,9 +138,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderCurve: 'continuous',
     overflow: 'hidden',
-  },
-  presionada: {
-    opacity: 0.75,
   },
   media: {
     width: '100%',
@@ -155,10 +162,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: 5,
   },
-  menu: {
+  menuPosicion: {
     position: 'absolute',
     top: spacing.sm,
     right: spacing.sm,
+  },
+  menu: {
     width: 36,
     height: 36,
     borderRadius: radius.full,
